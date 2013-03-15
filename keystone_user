@@ -1,0 +1,87 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# Based on Jimmy Tang's implementation
+
+DOCUMENTATION = '''
+---
+module: keystone_user
+short_description: Manage OpenStack users, tenants and roles
+requirements: [ python-keystoneclient ]
+examples:
+   - code: 'keystone_user: name=cinder pass="servicepass" tenant=name:service email="cinder@example.com" role="name:admin"'
+author: Lorin Hochstein
+'''
+
+try:
+    from keystoneclient.v2_0 import client
+
+except ImportError:
+    keystoneclient_found = False
+else:
+    keystoneclient_found = True
+
+# Example openrc auth file
+# http://docs.openstack.org/folsom/openstack-compute/install/apt/content/novarc-file.html
+# export OS_USERNAME=admin
+# export OS_TENANT_NAME=openstackDemo
+# export OS_PASSWORD=secretword
+# export OS_AUTH_URL=http://192.168.206.130:5000/v2.0/
+# export OS_REGION_NAME=RegionOne
+
+
+def authenticate(endpoint, token, login_user, login_password):
+    """ Return a keystone client object"""
+
+    if login_token:
+        return client.Client(endpoint=endpoint, token=token)
+    else:
+        return client.Client(endpoint=endpoint, username=login_user,
+                             password=login_password)
+
+def main():
+
+    module = AnsibleModule(
+        argument_spec=dict(
+            name = dict(required=True),
+            password = dict(required=False),
+            tenant = dict(required=False),
+            email = dict(required=False),
+            role = dict(required=False),
+            state = dict(default='present', choices=['present', 'absent']),
+            endpoint = dict(required=False, default="http://127.0.0.1:35357/v2.0")
+            token = dict(required=False),
+            login_user = dict(required=False),
+            login_password=dict(required=False)
+        ),
+        supports_check_mode=True,
+        mutually_exclusive = [ ['token', 'login_user'],
+                               ['token', 'login_password'] ]
+    )
+
+    if not keystoneclient_found:
+        module.fail_json(msg="the python-keystoneclient module is required")
+
+    name = module.params['name']
+    password = module.params['password']
+    tenant = module.params['tenant']
+    email = module.params['email']
+    role = module.params['role']
+    state = module.params['state']
+    endpoint = module.params['endpoint']
+    authfile = module.params['authfile']
+    login_token = module.params['login_token']
+    login_user = module.params['login_user']
+    login_password = module.params['login_password']
+
+    keystone = authenticate(endpoint, token, login_user, login_password)
+
+    changed = False
+
+    module.exit_json(
+        changed=changed, msg="OK",
+        name=name)
+
+# this is magic, see lib/ansible/module_common.py
+#<<INCLUDE_ANSIBLE_MODULE_COMMON>>
+main()
