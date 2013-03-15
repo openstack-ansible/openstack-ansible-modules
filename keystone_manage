@@ -1,0 +1,38 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+DOCUMENTATION = '''
+---
+module: keystone_manage
+short_description: Initialize OpenStack Identity (keystone) database
+options:
+  action:
+    description:
+      - action to perform. Currently only dbysnc is supported
+    required: true
+requirements: [ keystone ]
+examples:
+    - code: keystone_manage action=dbsync
+
+author: Lorin Hochstein
+'''
+
+
+def main():
+
+    module = AnsibleModule(
+        argument_spec=dict(
+            action=dict(required=True)
+        ),
+        support_check_mode=True
+    )
+
+    action = module.params['action']
+    if action not in ['dbsync', 'db_sync']:
+        module.fail_json(msg="Only supported action is 'dbsync'")
+
+    module.exit_json(change=False)
+
+# this is magic, see lib/ansible/module_common.py
+#<<INCLUDE_ANSIBLE_MODULE_COMMON>>
+main()
