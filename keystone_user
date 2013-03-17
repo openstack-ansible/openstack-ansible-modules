@@ -68,6 +68,7 @@ def ensure_tenant_exists(keystone, tenant, tenant_description, check_mode):
 
     keystone.tenants.create(tenant_name=tenant, description=tenant_description,
                             enabled=True)
+    return True
 
 
 def main():
