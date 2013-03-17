@@ -40,35 +40,94 @@ def authenticate(endpoint, token, login_user, login_password):
 
 
 '''
-user  tenant  role   state
-----  ------  ----  --------
- X                  present     create_user (default tenant)
- X                  absent      remove_user
-        X           present     create_tenant
-        X           absemt      remove_tenant
- X      X           present     create_tenant, create_user(tenant)
- X      X           absent      ?????
+tenant user  role   state
+------ ----  ----  --------
+  X                 present     create_tenant
+  X                 absent      remove_tenant
+  X     X           present     create_user
+  X     X           absent      remove_user
 
 '''
+
+
+def tenant_exists(keystone, tenant):
+    """ Return True if tenant already exists"""
+    return tenant in [x.name for x in keystone.tenants.list()]
+
+
+def user_exists(keystone, user):
+    """" Return True if user already exists"""
+    return user in [x.name for x in keystone.users.list()]
+
+
+def get_user_id(keystone, user):
+    ks_users = [x for x in keystone.users.list() if x.name == user]
+    if len(ks_users) == 0:
+        raise KeyError("No keystone users with name %s" % user)
+    elif len(ks_users) > 1:
+        raise ValueError("%d users with name %s" % (len(ks_users), user))
+    else:
+        return ks_users[0].id
+
+
+def get_tenant_id(keystone, tenant):
+    ks_tenants = [x for x in keystone.tenants.list() if x.name == tenant]
+    if len(ks_tenants) == 0:
+        raise KeyError("No keystone tenants with name %s" % tenant)
+    elif len(ks_tenants) > 1:
+        raise ValueError("%d tenants with name %s" % (len(ks_tenants), tenant))
+    else:
+        return ks_tenants[0].id
 
 
 def ensure_tenant_exists(keystone, tenant, tenant_description, check_mode):
     """ Check if tenant exists.
 
-        Return True if a new tenant was created, False if it already existed
+        Return (True, id) if a new tenant was created, (False, None) if it
+        already existed.
     """
-    # We assume initially that we'll need to create a tenant
 
-    if tenant in [x.name for x in keystone.tenants.list()]:
-        return False
+    # Check if tenant already exists
+    if tenant_exists(keystone, tenant):
+        return (False, None)
 
     # We now know we will have to create a new tenant
     if check_mode:
-        return True
+        return (True, get_tenant_id(keystone, tenant))
 
-    keystone.tenants.create(tenant_name=tenant, description=tenant_description,
-                            enabled=True)
-    return True
+    ks_tenant = keystone.tenants.create(tenant_name=tenant,
+                                        description=tenant_description,
+                                        enabled=True)
+    return (True, ks_tenant.id)
+
+
+def ensure_user_exists(keystone, user, password, email, tenant, check_mode):
+    """ Check if user exists
+
+        Return True if a new user was created, False user alrady existed
+    """
+
+    # Check if user alrady exists
+    if user_exists(keystone, user):
+        return (False, None)
+
+    # We now know we will have to create a new user
+    if check_mode:
+        return (True, None)
+
+    matched_tenants = [x for x in keystone.tenants.list() if x.name == tenant]
+    # If there's more than one tenant with the same name, fail
+    if len(matched_tenants) > 1:
+        raise ValueError("Multiple tenants are named %s" % tenant)
+    elif len(matched_tenants) == 0:
+        raise ValueError("Tenant named %s does not exist" % tenant)
+
+    tenant_id = matched_tenants[0].id
+
+    ks_user = keystone.users.create(name=user, password=password, email=email,
+                                    tenant_id=tenant_id)
+
+    return (True, ks_user.id)
 
 
 def main():
@@ -96,11 +155,11 @@ def main():
     if not keystoneclient_found:
         module.fail_json(msg="the python-keystoneclient module is required")
 
-    #user = module.params['user']
-    #password = module.params['password']
+    user = module.params['user']
+    password = module.params['password']
     tenant = module.params['tenant']
     tenant_description = module.params['tenant_description']
-    #email = module.params['email']
+    email = module.params['email']
     #role = module.params['role']
     state = module.params['state']
     endpoint = module.params['endpoint']
@@ -112,14 +171,21 @@ def main():
 
     changed = False
 
+    check_mode = module.check_mode
+
     if tenant:
-        if state == 'present':
-            changed = ensure_tenant_exists(keystone, tenant,
-                                           tenant_description,
-                                           module.check_mode)
+        if user:
+            if state == 'present':
+                change, id = ensure_user_exists(keystone, user, password,
+                                                email, tenant, check_mode)
+        else:
+            if state == 'present':
+                changed, id = ensure_tenant_exists(keystone, tenant,
+                                                   tenant_description,
+                                                   check_mode)
 
     module.exit_json(
-        changed=changed, msg="OK")
+        changed=changed, id=id)
 
 # this is magic, see lib/ansible/module_common.py
 #<<INCLUDE_ANSIBLE_MODULE_COMMON>>
