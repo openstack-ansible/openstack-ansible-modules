@@ -15,7 +15,6 @@ author: Lorin Hochstein
 
 try:
     from keystoneclient.v2_0 import client
-
 except ImportError:
     keystoneclient_found = False
 else:
@@ -104,7 +103,7 @@ def main():
     #role = module.params['role']
     state = module.params['state']
     endpoint = module.params['endpoint']
-    token = module.params['login_token']
+    token = module.params['token']
     login_user = module.params['login_user']
     login_password = module.params['login_password']
 
