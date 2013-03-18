@@ -42,7 +42,8 @@ def get_service(keystone, name):
         return services[0]
 
 
-def ensure_service_present(keystone, name, service_type, description, check_mode):
+def ensure_service_present(keystone, name, service_type, description,
+                           check_mode):
     """ Ensure the service is present and has the right values"""
     service = None
     try:
@@ -54,17 +55,18 @@ def ensure_service_present(keystone, name, service_type, description, check_mode
         # See if it matches exactly
         if service.name == name and \
            service.type == service_type and \
-           service.description==description:
+           service.description == description:
 
-           # Same, no changes needed
-           return (False, service.id)
+            # Same, no changes needed
+            return (False, service.id)
 
     # At this point, we know we will need to make a change
     if check_mode:
         return (True, None)
 
     if service is None:
-        service = keystone.services.create(name=name, service_type=service_type,
+        service = keystone.services.create(name=name,
+                                           service_type=service_type,
                                            description=description)
         return (True, service.id)
     else:

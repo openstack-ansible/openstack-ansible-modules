@@ -118,3 +118,20 @@ def test_ensure_service_present_when_present():
     # Assertions
     assert not changed
     assert_equal(id, "b6a7ff03f2574cd9b5c7c61186e0d781")
+
+def test_ensure_service_present_when_present_check():
+    """ ensure_services_present when the service is present, check mode"""
+    # Setup
+    keystone = setup()
+    name = "keystone"
+    service_type = "identity"
+    description = "Keystone Identity Service"
+    check_mode = True
+
+    # Code under test
+    (changed, id) = keystone_service.ensure_service_present(keystone, name,
+                        service_type, description, check_mode)
+
+    # Assertions
+    assert not changed
+    assert_equal(id, "b6a7ff03f2574cd9b5c7c61186e0d781")
