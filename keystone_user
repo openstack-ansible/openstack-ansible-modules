@@ -70,11 +70,23 @@ def get_tenant(keystone, name):
         return ks_tenants[0]
 
 
+def get_user(keystone, name):
+    """ Retrieve a user by name"""
+    ks_users = [x for x in keystone.users.list() if x.name == name]
+    if len(ks_users) == 0:
+        raise KeyError("No keystone users with name %s" % name)
+    elif len(ks_users) > 1:
+        raise ValueError("%d users with name %s" % (len(ks_users), name))
+    else:
+        return ks_users[0]
+
+
 def get_tenant_id(keystone, name):
     return get_tenant(keystone, name).id
 
 
-def ensure_tenant_exists(keystone, tenant, tenant_description, check_mode):
+def ensure_tenant_exists(keystone, tenant_name, tenant_description,
+                         check_mode):
     """ Ensure that a tenant exists.
 
         Return (True, id) if a new tenant was created, (False, None) if it
@@ -83,7 +95,7 @@ def ensure_tenant_exists(keystone, tenant, tenant_description, check_mode):
 
     # Check if tenant already exists
     try:
-        tenant = get_tenant(keystone, tenant)
+        tenant = get_tenant(keystone, tenant_name)
     except KeyError:
         # Tenant doesn't exist yet
         pass
@@ -100,9 +112,9 @@ def ensure_tenant_exists(keystone, tenant, tenant_description, check_mode):
 
     # We now know we will have to create a new tenant
     if check_mode:
-        return (True, get_tenant_id(keystone, tenant))
+        return (True, get_tenant_id(keystone, tenant_name))
 
-    ks_tenant = keystone.tenants.create(tenant_name=tenant,
+    ks_tenant = keystone.tenants.create(tenant_name=tenant_name,
                                         description=tenant_description,
                                         enabled=True)
     return (True, ks_tenant.id)
@@ -122,41 +134,42 @@ def ensure_tenant_removed(keystone, tenant, check_mode):
         return True
 
 
-def ensure_user_exists(keystone, user, password, email, tenant, check_mode):
+def ensure_user_exists(keystone, user_name, password, email, tenant_name,
+                       check_mode):
     """ Check if user exists
 
         Return (True, id) if a new user was created, (False, id) user alrady
         exists
     """
 
-    # Check if user already exists
-    if user_exists(keystone, user):
-        return (False, None)
+    # Check if tenant already exists
+    try:
+        user = get_user(keystone, user_name)
+    except KeyError:
+        # Tenant doesn't exist yet
+        pass
+    else:
+        # User does exist, w,e're done
+        return (False, user.id)
 
     # We now know we will have to create a new user
     if check_mode:
         return (True, None)
 
-    matched_tenants = [x for x in keystone.tenants.list() if x.name == tenant]
-    # If there's more than one tenant with the same name, fail
-    if len(matched_tenants) > 1:
-        raise ValueError("Multiple tenants are named %s" % tenant)
-    elif len(matched_tenants) == 0:
-        raise ValueError("Tenant named %s does not exist" % tenant)
+    tenant = get_tenant(keystone, tenant_name)
 
-    tenant_id = matched_tenants[0].id
-
-    ks_user = keystone.users.create(name=user, password=password, email=email,
-                                    tenant_id=tenant_id)
-
-    return (True, ks_user.id)
+    user = keystone.users.create(name=user_name, password=password,
+                                 email=email, tenant_id=tenant.id)
+    return (True, user.id)
 
 
 def ensure_user_removed(keystone, user, check_mode):
     raise NotImplementedError("Not yet implemented")
 
+
 def ensure_role_exists(keystone, uesr, tenant, role, check_mode):
     raise NotImplementedError("Not yet implemented")
+
 
 def ensure_role_removed(keystone, uesr, tenant, role, check_mode):
     raise NotImplementedError("Not yet implemented")

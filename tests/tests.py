@@ -79,10 +79,10 @@ def test_ensure_user_exists_when_present():
 
     # Code udner test
     (changed, id) = keystone_user.ensure_user_exists(keystone,
-                                 user="johndoe",
+                                 user_name="johndoe",
                                  password="12345",
                                  email="johndoe@example.com",
-                                 tenant="foo",
+                                 tenant_name="foo",
                                  check_mode=False)
 
     # Assertions
