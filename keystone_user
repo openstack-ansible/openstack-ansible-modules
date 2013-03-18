@@ -94,12 +94,20 @@ def ensure_tenant_exists(keystone, tenant, tenant_description, check_mode):
 
     # Check if tenant already exists
     try:
-        id = get_tenant_id(keystone, tenant)
+        tenant = get_tenant(keystone, tenant)
     except KeyError:
         # Tenant doesn't exist yet
         pass
     else:
-        return (False, id)
+        if tenant.description == tenant_description:
+            return (False, tenant.id)
+        else:
+            # We need to update the tenant description
+            if check_mode:
+                return (True, tenant.id)
+            else:
+                tenant.update(description=tenant_description)
+                return (True, tenant.id)
 
     # We now know we will have to create a new tenant
     if check_mode:
