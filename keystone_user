@@ -222,7 +222,7 @@ def dispatch(keystone, user=None, password=None, tenant=None,
     if tenant:
         if user:
             if state == 'present':
-                change, id = ensure_user_exists(keystone, user, password,
+                changed, id = ensure_user_exists(keystone, user, password,
                                                 email, tenant, check_mode)
         else:
             if state == 'present':
