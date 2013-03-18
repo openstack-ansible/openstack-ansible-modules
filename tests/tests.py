@@ -133,7 +133,7 @@ def test_dispatch_role_present(mock_ensure_role_exists):
 
     # Assertions
     mock_ensure_role_exists.assert_called_with(keystone, "root",
-                                               "foo", "admin")
+                                               "foo", "admin", False)
     assert_equal(res,
         dict(changed=True, id="7df22b53d9c4405f92032c802178a31e"))
 

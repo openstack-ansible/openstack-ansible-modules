@@ -39,17 +39,6 @@ def authenticate(endpoint, token, login_user, login_password):
                              password=login_password)
 
 
-'''
-tenant user  role   state
------- ----  ----  --------
-  X                 present     create_tenant
-  X                 absent      remove_tenant
-  X     X           present     create_user
-  X     X           absent      remove_user
-
-'''
-
-
 def tenant_exists(keystone, tenant):
     """ Return True if tenant already exists"""
     return tenant in [x.name for x in keystone.tenants.list()]
@@ -162,6 +151,16 @@ def ensure_user_exists(keystone, user, password, email, tenant, check_mode):
     return (True, ks_user.id)
 
 
+def ensure_user_removed(keystone, user, check_mode):
+    raise NotImplementedError("Not yet implemented")
+
+def ensure_role_exists(keystone, uesr, tenant, role, check_mode):
+    raise NotImplementedError("Not yet implemented")
+
+def ensure_role_removed(keystone, uesr, tenant, role, check_mode):
+    raise NotImplementedError("Not yet implemented")
+
+
 def main():
 
     module = AnsibleModule(
@@ -216,21 +215,40 @@ def dispatch(keystone, user=None, password=None, tenant=None,
              login_password=None, check_mode=False):
     """ Dispatch to the appropriate method.
 
-        Returns a dict that will be passed to exit_json """
+        Returns a dict that will be passed to exit_json
+
+        tenant  user  role   state
+        ------  ----  ----  --------
+          X                  present     ensure_tenant_exists
+          X                  absent      ensure_tenant_removed
+          X      X           present     ensure_user_exists
+          X      X           absent      ensure_user_removed
+          X      X     X     present     ensure_role_exists
+          X      X     X     absent      ensure_role_removed
+
+
+        """
     changed = False
     id = None
-    if tenant:
-        if user:
-            if state == 'present':
-                changed, id = ensure_user_exists(keystone, user, password,
-                                                email, tenant, check_mode)
-        else:
-            if state == 'present':
-                changed, id = ensure_tenant_exists(keystone, tenant,
-                                                   tenant_description,
-                                                   check_mode)
-            elif state == 'absent':
-                ensure_tenant_removed(keystone, tenant, check_mode)
+    if tenant and not user and not role and state == "present":
+        changed, id = ensure_tenant_exists(keystone, tenant,
+                                           tenant_description, check_mode)
+    elif tenant and not user and not role and state == "absent":
+        changed = ensure_tenant_removed(keystone, tenant, check_mode)
+    elif tenant and user and not role and state == "present":
+        changed, id = ensure_user_exists(keystone, user, password,
+                                         email, tenant, check_mode)
+    elif tenant and user and not role and state == "absent":
+        changed = ensure_user_removed(keystone, user, check_mode)
+    elif tenant and user and role and state == "present":
+        changed, id = ensure_role_exists(keystone, user, tenant, role,
+                                         check_mode)
+    elif tenant and user and role and state == "absent":
+        changed = ensure_role_removed(keystone, user, tenant, role, check_mode)
+    else:
+        # Should never reach here
+        raise ValueError("Code should never reach here")
+
     return dict(changed=changed, id=id)
 
 # this is magic, see lib/ansible/module_common.py
