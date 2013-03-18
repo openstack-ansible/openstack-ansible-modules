@@ -106,7 +106,7 @@ def ensure_endpoint_present(keystone, name, public_url, internal_url,
         if endpoint.publicurl == public_url and \
            endpoint.adminurl == admin_url and \
            endpoint.internalurl == internal_url and \
-           region == region:
+           endpoint.region == region:
 
             # Same, no changes needed
             return (False, endpoint.id)

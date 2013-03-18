@@ -222,18 +222,18 @@ def test_ensure_endpoint_present_when_present():
 def test_ensure_endpoint_present_when_present_check():
     """ ensure_endpoint_present when the endpoint is present, check mode"""
     # Setup
-    assert False
     keystone = setup()
     name = "keystone"
     public_url = "http://192.168.206.130:5000/v2.0"
     internal_url = "http://192.168.206.130:5000/v2.0"
     admin_url = "http://192.168.206.130:35357/v2.0"
+    region = "RegionOne"
     check_mode = True
 
     # Code under test
     (changed, id) = keystone_service.ensure_endpoint_present(keystone, name,
-                        public_url, internal_url, admin_url, check_mode)
+                        public_url, internal_url, admin_url, region, check_mode)
 
     # Assertions
     assert not changed
-    assert_equal(id, "b6a7ff03f2574cd9b5c7c61186e0d781")
+    assert_equal(id, "600759628a214eb7b3acde39b1e85180")
