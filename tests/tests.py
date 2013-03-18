@@ -46,6 +46,26 @@ def test_ensure_tenant_exists_when_present():
     assert_equal(id, "21b505b9cbf84bdfba60dc08cc2a4b8d")
 
 
+def test_ensure_tenant_exists_when_absent():
+    """ ensure_tenant_exists when tenant does not exist """
+    # Setup
+    keystone = setup_foo_tenant()
+    keystone.tenants.create = mock.Mock(return_value=mock.Mock(
+        id="7c310f797aa045898e2884a975ab32ab"))
+
+    # Code under test
+    (changed, id) = keystone_user.ensure_tenant_exists(keystone, "bar",
+                    "The bar tenant", False)
+
+    # Assertions
+    assert changed
+    assert_equal(id, "7c310f797aa045898e2884a975ab32ab")
+    keystone.tenants.create.assert_called_with(tenant_name="bar",
+                                               description="The bar tenant",
+                                               enabled=True)
+
+
+
 def test_change_tenant_description():
     """ ensure_tenant_exists with a change in description """
     # Setup
