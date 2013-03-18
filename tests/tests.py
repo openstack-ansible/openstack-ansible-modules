@@ -153,12 +153,15 @@ def test_ensure_user_exists_when_present_check():
     assert_equal(id, "24073d9426ab4bc59527955d7c486179")
 
 
-@mock.patch('keystone_user.ensure_user_exists')
-def test_ensure_user_exists_when_absent(mock_ensure_user_exists):
+def test_ensure_user_exists_when_absent():
     # Setup
     keystone = setup_tenant_user_role()
-    mock_ensure_user_exists.return_value = (True,
-                                       "1e31370740a14668a2d3267c39c7af07")
+    user = mock.Mock()
+    user.id = "5ce4b6ef2e814a4897907cc6db879536"
+    user.name = "skippyjonjones"
+    user.email = "sjj@example.com"
+
+    keystone.users.create = mock.Mock(return_value=user)
 
     # Code under test
     (changed, id) = keystone_user.ensure_user_exists(keystone,
@@ -170,7 +173,12 @@ def test_ensure_user_exists_when_absent(mock_ensure_user_exists):
 
     # Assertions
     assert changed
-    assert_equal(id, "1e31370740a14668a2d3267c39c7af07")
+    assert_equal(id, "5ce4b6ef2e814a4897907cc6db879536")
+    keystone.users.create.assert_called_with(
+        name='skippyjonjones',
+        password='1234567',
+        email='sjj@example.com',
+        tenant_id='21b505b9cbf84bdfba60dc08cc2a4b8d')
 
 
 def test_ensure_role_exists_when_present():
