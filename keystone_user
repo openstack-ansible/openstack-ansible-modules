@@ -258,11 +258,19 @@ def main():
 
     check_mode = module.check_mode
 
-    d = dispatch(keystone, user, password, tenant, tenant_description, email,
-                role, state, endpoint, token, login_user, login_password,
-                check_mode)
-
-    module.exit_json(**d)
+    try:
+        d = dispatch(keystone, user, password, tenant, tenant_description,
+                     email, role, state, endpoint, token, login_user,
+                     login_password, check_mode)
+    except Exception as e:
+        if check_mode:
+            # If we have a failure in check mode
+            module.exit_json(changed=True,
+                             msg="exception: %s" % e.message)
+        else:
+            module.fail_json(msg=e.message)
+    else:
+        module.exit_json(**d)
 
 
 def dispatch(keystone, user=None, password=None, tenant=None,
