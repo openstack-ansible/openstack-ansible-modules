@@ -93,34 +93,35 @@ def ensure_endpoint_present(keystone, name, public_url, internal_url,
     """ Ensure the service endpoint is present and have the right values
 
         Assumes the service object has already been created at this point"""
-        service = get_service(keystone, name)
-        endpoint = None
-        try:
-            endpoint = get_endpoint(keystone, name)
-        except:
-            # Endpoint doesn't exist yet, we'll need to create one
-            pass
-        else:
-            # See if it matches
-            if endpoint.publicurl == public_url and \
-               endpoint.adminurl == admin_url and \
-               endpoint.internalurl == internal_url and \
-               region == region:
 
-                # Same, no changes needed
-                return (False, endpoint.id)
+    service = get_service(keystone, name)
+    endpoint = None
+    try:
+        endpoint = get_endpoint(keystone, name)
+    except:
+        # Endpoint doesn't exist yet, we'll need to create one
+        pass
+    else:
+        # See if it matches
+        if endpoint.publicurl == public_url and \
+           endpoint.adminurl == admin_url and \
+           endpoint.internalurl == internal_url and \
+           region == region:
 
-        # At this point, we know we will need to make a change
-        if check_mode:
-            return (True, None)
+            # Same, no changes needed
+            return (False, endpoint.id)
 
-        if endpoint is None:
-            endpoint = keystone.endpoints.create(region=region,
-                                                 service_id=service.id
-                                                 publicurl=public_url,
-                                                 adminurl=admin_url,
-                                                 internalurl=internal_url)
-            return (True, endpoint.id)
+    # At this point, we know we will need to make a change
+    if check_mode:
+        return (True, None)
+
+    if endpoint is None:
+        endpoint = keystone.endpoints.create(region=region,
+                                             service_id=service.id,
+                                             publicurl=public_url,
+                                             adminurl=admin_url,
+                                             internalurl=internal_url)
+        return (True, endpoint.id)
     else:
         msg = "keystone v2 API doesn't support updating endpoints"
         raise ValueError(msg)
@@ -128,6 +129,7 @@ def ensure_endpoint_present(keystone, name, public_url, internal_url,
 
 def ensure_service_absent(keystone, name, check_mode):
     """ Ensure the service is absent"""
+
     raise NotImplementedError()
 
 def ensure_endpoint_absent(keystone, name, check_mode):
