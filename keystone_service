@@ -29,6 +29,38 @@ def authenticate(endpoint, token, login_user, login_password):
         return client.Client(endpoint=endpoint, username=login_user,
                              password=login_password)
 
+def ensure_service_present(keystone, name, service_type, description, check_mode):
+    """ Ensure the service is present and has the right values"""
+    raise NotImplementedError()
+
+def ensure_endpoints_present(keystone, name, public_url, internal_url,
+                             admin_url, check_mode):
+    """ Ensure the service endpoints are present and have the right values """
+    raise NotImplementedError()
+
+
+def ensure_service_absent(keystone, name, check_mode):
+    """ Ensure the service is absent"""
+    raise NotImplementedError()
+
+def ensure_endpoints_absent(keystone, name, check_mode):
+    """ Ensure the service endpoints """
+    raise NotImplementedError()
+
+
+def dispatch(keystone, name, service_type, description, public_url,
+             internal_url, admin_url, region, state, check_mode):
+
+    if state == 'present':
+        ensure_service_present(keystone, name, service_type, description,
+                               check_mode)
+        ensure_endpoints_present(keystone, name, public_url, internal_url,
+                                admin_url, check_mode)
+    elif state == 'absent':
+        ensure_endpoints_absent(keystone, name, check_mode)
+        ensure_service_absent(keystone, name, check_mode)
+
+
 
 def main():
 
@@ -37,9 +69,10 @@ def main():
             name=dict(required=True),
             type=dict(required=True),
             description=dict(required=False),
-            publicurl=dict(required=True, aliases=['url']),
-            internalurl=dict(required=False),
-            adminurl=dict(required=False),
+            public_url=dict(required=True, aliases=['url', 'publicurl']),
+            internal_url=dict(required=False, aliases=['internalurl']),
+            admin_url=dict(required=False, aliases=['adminurl']),
+            region=dict(required=True),
             state=dict(default='present', choices=['present', 'absent']),
             endpoint=dict(required=False,
                           default="http://127.0.0.1:35357/v2.0"),
@@ -57,10 +90,34 @@ def main():
     login_user = module.params['login_user']
     login_password = module.params['login_password']
 
+    name = module.params['name']
+    service_type = module.params['type']
+    description = module.params['description']
+    public_url = module.params['publicurl']
+    internal_url = module.params['internalurl']
+    if internal_url is None:
+        internal_url = public_url
+    admin_url = modules.params['adminurl']
+    if admin_url is None:
+        admin_url = public_url
+    region = module.params['region']
+    state = module.params['state']
 
     keystone = authenticate(endpoint, token, login_user, login_password)
     check_mode = module.check_mode
 
+    try:
+        d = dispatch(keystone, name, service_type, description, region,
+                public_url, internal_url, admin_url, region, state, check_mode)
+    except Exception as e:
+        if check_mode:
+            # If we have a failure in check mode
+            module.exit_json(changed=True,
+                             msg="exception: %s" % e.message)
+        else:
+            module.fail_json(msg=e.message)
+    else:
+        module.exit_json(**d)
 
 
 # this is magic, see lib/ansible/module_common.py
