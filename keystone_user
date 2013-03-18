@@ -70,14 +70,18 @@ def get_user_id(keystone, user):
         return ks_users[0].id
 
 
-def get_tenant_id(keystone, tenant):
+def get_tenant(keystone, tenant):
     ks_tenants = [x for x in keystone.tenants.list() if x.name == tenant]
     if len(ks_tenants) == 0:
         raise KeyError("No keystone tenants with name %s" % tenant)
     elif len(ks_tenants) > 1:
         raise ValueError("%d tenants with name %s" % (len(ks_tenants), tenant))
     else:
-        return ks_tenants[0].id
+        return ks_tenants[0]
+
+
+def get_tenant_id(keystone, tenant):
+    return get_tenant(keystone, tenant).id
 
 
 def ensure_tenant_exists(keystone, tenant, tenant_description, check_mode):
