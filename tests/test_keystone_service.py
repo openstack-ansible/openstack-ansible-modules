@@ -135,3 +135,48 @@ def test_ensure_service_present_when_present_check():
     # Assertions
     assert not changed
     assert_equal(id, "b6a7ff03f2574cd9b5c7c61186e0d781")
+
+
+def test_ensure_service_present_when_absent():
+    """ ensure_services_present when the service is absent"""
+    # Setup
+    keystone = setup()
+    service = mock.Mock(id="a7ebed35051147d4abbe2ee049eeb346")
+    keystone.services.create = mock.Mock(return_value=service)
+    name = "nova"
+    service_type = "compute"
+    description = "Compute Service"
+    check_mode = False
+
+    # Code under test
+    (changed, id) = keystone_service.ensure_service_present(keystone, name,
+                        service_type, description, check_mode)
+
+    # Assertions
+    assert changed
+    assert_equal(id, "a7ebed35051147d4abbe2ee049eeb346")
+    keystone.services.create.assert_called_with(name=name,
+                                                service_type=service_type,
+                                                description=description)
+
+
+def test_ensure_service_present_when_absent_check():
+    """ ensure_services_present when the service is absent, check mode"""
+    # Setup
+    keystone = setup()
+    service = mock.Mock(id="a7ebed35051147d4abbe2ee049eeb346")
+    keystone.services.create = mock.Mock(return_value=service)
+    name = "nova"
+    service_type = "compute"
+    description = "Compute Service"
+    check_mode = True
+
+    # Code under test
+    (changed, id) = keystone_service.ensure_service_present(keystone, name,
+                        service_type, description, check_mode)
+
+    # Assertions
+    assert changed
+    assert_equal(id, None)
+    assert not keystone.services.create.called
+
