@@ -135,9 +135,31 @@ def test_ensure_role_exists_when_present():
     # Assertions
     assert not changed
     assert_equal(id, "34a699ab89d04c38894bbf3d998e5229")
+    assert not keystone.roles.create.called
 
-def test_ensure_role_exists_when_absent():
-    raise SkipTest("Not yet implemented")
+def test_ensure_role_exists_when_role_is_absent():
+    # Setup
+    keystone = setup_tenant_user_role()
+    keystone.roles.create = mock.Mock(return_value=mock.Mock(
+        id="40b14f9c2d114b38b3f6bced49a792b8"))
+    keystone.roles.roles_for_user = mock.Mock(return_value=[])
+
+    # Code under test
+    user = "johndoe"
+    tenant = "acme"
+    role = "webuser"
+    check_mode = False
+    (changed, id) = keystone_user.ensure_role_exists(keystone, user, tenant,
+                                                    role, check_mode)
+
+    # Assertions
+    assert changed
+    assert_equal(id, "40b14f9c2d114b38b3f6bced49a792b8")
+    keystone.roles.create.assert_called_with("webuser")
+
+def test_ensure_role_exists_when_role_is_present_but_not_associated():
+    raise SkipTest()
+
 
 
 @mock.patch('keystone_user.ensure_tenant_exists')
