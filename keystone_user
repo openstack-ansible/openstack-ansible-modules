@@ -192,7 +192,7 @@ def main():
     tenant = module.params['tenant']
     tenant_description = module.params['tenant_description']
     email = module.params['email']
-    #role = module.params['role']
+    role = module.params['role']
     state = module.params['state']
     endpoint = module.params['endpoint']
     token = module.params['token']
@@ -201,10 +201,24 @@ def main():
 
     keystone = authenticate(endpoint, token, login_user, login_password)
 
-    changed = False
-
     check_mode = module.check_mode
 
+    d = dispatch(keystone, user, password, tenant, tenant_description, email,
+                role, state, endpoint, token, login_user, login_password,
+                check_mode)
+
+    module.exit_json(**d)
+
+
+def dispatch(keystone, user=None, password=None, tenant=None,
+             tenant_description=None, email=None, role=None,
+             state="present", endpoint=None, token=None, login_user=None,
+             login_password=None, check_mode=False):
+    """ Dispatch to the appropriate method.
+
+        Returns a dict that will be passed to exit_json """
+    changed = False
+    id = None
     if tenant:
         if user:
             if state == 'present':
@@ -217,9 +231,7 @@ def main():
                                                    check_mode)
             elif state == 'absent':
                 ensure_tenant_removed(keystone, tenant, check_mode)
-
-    module.exit_json(
-        changed=changed, id=id)
+    return dict(changed=changed, id=id)
 
 # this is magic, see lib/ansible/module_common.py
 #<<INCLUDE_ANSIBLE_MODULE_COMMON>>
