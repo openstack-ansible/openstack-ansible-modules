@@ -1,6 +1,7 @@
 import keystone_user
 import mock
 from nose.tools import assert_equal
+from nose.plugins.skip import SkipTest
 
 
 def setup_foo_tenant():
@@ -65,22 +66,24 @@ def test_ensure_tenant_exists_when_absent():
                                                enabled=True)
 
 
-def test_change_tenant_description():
-    """ ensure_tenant_exists with a change in description """
-    # Setup
-    keystone = setup_foo_tenant()
+def test_ensure_user_exists_when_present():
+    raise SkipTest("Not yet implemented")
 
-    # Code under test
-    (changed, id) = keystone_user.ensure_tenant_exists(keystone, "foo",
-                    "The foo tenant with a description change", False)
 
-    # Assertions
-    assert changed
-    assert_equal(id, "21b505b9cbf84bdfba60dc08cc2a4b8d")
+def test_ensure_user_exists_when_absent():
+    raise SkipTest("Not yet implemented")
+
+
+def test_ensure_role_exists_when_present():
+    raise SkipTest("Not yet implemented")
+
+
+def test_ensure_role_exists_when_absent():
+    raise SkipTest("Not yet implemented")
 
 
 @mock.patch('keystone_user.ensure_tenant_exists')
-def test_dispatch_tenant_present(mock_ensure_tenant_exists):
+def test_dispatch_tenant_when_present(mock_ensure_tenant_exists):
     """ dispatch with tenant only"""
     # Setup
     keystone = setup_foo_tenant()
@@ -98,8 +101,22 @@ def test_dispatch_tenant_present(mock_ensure_tenant_exists):
         dict(changed=True, id="34469137412242129cd908e384717794"))
 
 
+def test_change_tenant_description():
+    """ ensure_tenant_exists with a change in description """
+    # Setup
+    keystone = setup_foo_tenant()
+
+    # Code under test
+    (changed, id) = keystone_user.ensure_tenant_exists(keystone, "foo",
+                    "The foo tenant with a description change", False)
+
+    # Assertions
+    assert changed
+    assert_equal(id, "21b505b9cbf84bdfba60dc08cc2a4b8d")
+
+
 @mock.patch('keystone_user.ensure_user_exists')
-def test_dispatch_user_present(mock_ensure_user_exists):
+def test_dispatch_user_when_present(mock_ensure_user_exists):
     """ dispatch with tenant and user"""
     # Setup
     keystone = setup_foo_tenant()
@@ -136,4 +153,3 @@ def test_dispatch_role_present(mock_ensure_role_exists):
                                                "foo", "admin", False)
     assert_equal(res,
         dict(changed=True, id="7df22b53d9c4405f92032c802178a31e"))
-
