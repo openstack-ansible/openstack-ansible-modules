@@ -44,11 +44,11 @@ def test_dispatch_service_present(mock_ensure_service_present,
     name = "keystone"
     service_type = "identity"
     description = "Keystone Identity Service"
-    region = "RegionOne"
     state = "present"
     public_url = "http://192.168.206.130:5000/v2.0"
     internal_url = "http://192.168.206.130:5000/v2.0"
     admin_url = "http://192.168.206.130:35357/v2.0"
+    region = "RegionOne"
     check_mode = False
 
     # Code under test
@@ -237,3 +237,76 @@ def test_ensure_endpoint_present_when_present_check():
     # Assertions
     assert not changed
     assert_equal(id, "600759628a214eb7b3acde39b1e85180")
+
+
+def test_ensure_endpoint_present_when_absent():
+    """ ensure_endpoint_present when the endpoint is absent """
+    # Setup
+    keystone = setup()
+    # Mock out the endpoints create
+    endpoint = mock.Mock(id="622386d836b14fd986d9cec7504d208a",
+                 publicurl="http://192.168.206.130:8774/v2/%(tenant_id)s",
+                 internalurl="http://192.168.206.130:8774/v2/%(tenant_id)s",
+                 adminurl="http://192.168.206.130:8774/v2/%(tenant_id)s",
+                 region="RegionOne")
+
+    keystone.endpoints.create = mock.Mock(return_value=endpoint)
+
+    # We need to add a service, but not an endpoint
+    service = mock.Mock(id="0ad62de6cfe044c7a77ad3a7f2851b5d",
+                        type="compute",
+                        description="Compute Service")
+    service.name = "nova"
+    keystone.services.list.return_value.append(service)
+
+    name = "nova"
+    public_url = "http://192.168.206.130:8774/v2/%(tenant_id)s"
+    internal_url = "http://192.168.206.130:8774/v2/%(tenant_id)s"
+    admin_url = "http://192.168.206.130:8774/v2/%(tenant_id)s"
+    region = "RegionOne"
+    check_mode = False
+
+    # Code under test
+    (changed, id) = keystone_service.ensure_endpoint_present(keystone, name,
+                        public_url, internal_url, admin_url, region,
+                        check_mode)
+
+    # Assertions
+    assert changed
+    assert_equal(id, "622386d836b14fd986d9cec7504d208a")
+    keystone.endpoints.create.assert_called_with(
+        service_id="0ad62de6cfe044c7a77ad3a7f2851b5d",
+         publicurl="http://192.168.206.130:8774/v2/%(tenant_id)s",
+         internalurl="http://192.168.206.130:8774/v2/%(tenant_id)s",
+         adminurl="http://192.168.206.130:8774/v2/%(tenant_id)s",
+        region="RegionOne")
+
+
+def test_ensure_endpoint_present_when_absent_check():
+    """ ensure_endpoint_present when the endpoint is absent, check mode"""
+    # Setup
+    keystone = setup()
+    # We need to add a service, but not an endpoint
+    service = mock.Mock(id="0ad62de6cfe044c7a77ad3a7f2851b5d",
+                        type="compute",
+                        description="Compute Service")
+    service.name = "nova"
+    keystone.services.list.return_value.append(service)
+
+
+    name = "nova"
+    public_url = "http://192.168.206.130:8774/v2/%(tenant_id)s"
+    internal_url = "http://192.168.206.130:8774/v2/%(tenant_id)s"
+    admin_url = "http://192.168.206.130:8774/v2/%(tenant_id)s"
+    region = "RegionOne"
+    check_mode = True
+
+    # Code under test
+    (changed, id) = keystone_service.ensure_endpoint_present(keystone, name,
+                        public_url, internal_url, admin_url, region, check_mode)
+
+    # Assertions
+    assert changed
+    assert_is_none(id)
+    assert not keystone.endpoints.create.called
+
