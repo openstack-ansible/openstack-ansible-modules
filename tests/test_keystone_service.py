@@ -6,12 +6,17 @@ from nose.plugins.skip import SkipTest
 
 def setup():
     keystone = mock.MagicMock()
-    service = mock.Mock()
-    service.id = "b6a7ff03f2574cd9b5c7c61186e0d781"
+    service = mock.Mock(id="b6a7ff03f2574cd9b5c7c61186e0d781",
+                        type="identity",
+                        description="Keystone Identity Service")
+    # Can't set <name> field in mock in initializer
     service.name = "keystone"
-    service.type = "identity"
-    service.description = "Keystone Identity Service"
     keystone.services.list = mock.Mock(return_value=[service])
+    endpoints = mock.Mock(id="600759628a214eb7b3acde39b1e85180",
+                          public_url = "http://192.168.206.130:5000/v2.0",
+                          internal_url = "http://192.168.206.130:5000/v2.0",
+                          admin_url = "http://192.168.206.130:35357/v2.0")
+    keystone.endpoints.list = [endpoints]
     return keystone
 
 
@@ -180,3 +185,22 @@ def test_ensure_service_present_when_absent_check():
     assert_equal(id, None)
     assert not keystone.services.create.called
 
+
+
+def test_ensure_endpoint_present_when_present():
+    """ ensure_endpoint_present when the endpoint is present"""
+    # Setup
+    keystone = setup()
+    name = "keystone"
+    public_url = "http://192.168.206.130:5000/v2.0"
+    internal_url = "http://192.168.206.130:5000/v2.0"
+    admin_url = "http://192.168.206.130:35357/v2.0"
+    check_mode = False
+
+    # Code under test
+    (changed, id) = keystone_service.ensure_endpoint_present(keystone, name,
+                        public_url, internal_url, admin_url, check_mode)
+
+    # Assertions
+    assert not changed
+    assert_equal(id, "b6a7ff03f2574cd9b5c7c61186e0d781")
