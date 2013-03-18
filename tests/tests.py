@@ -62,7 +62,7 @@ def test_ensure_tenant_exists_when_present():
 
 
 def test_ensure_tenant_exists_when_present_check():
-    """ ensure_tenant_exists when tenant does exists """
+    """ ensure_tenant_exists when tenant does exists, check mode """
 
     # Setup
     keystone = setup_tenant_user_role()
@@ -83,10 +83,11 @@ def test_ensure_tenant_exists_when_absent():
     keystone = setup_tenant_user_role()
     keystone.tenants.create = mock.Mock(return_value=mock.Mock(
         id="7c310f797aa045898e2884a975ab32ab"))
+    check_mode = False
 
     # Code under test
     (changed, id) = keystone_user.ensure_tenant_exists(keystone, "bar",
-                    "The bar tenant", False)
+                    "The bar tenant", check_mode)
 
     # Assertions
     assert changed
@@ -94,6 +95,24 @@ def test_ensure_tenant_exists_when_absent():
     keystone.tenants.create.assert_called_with(tenant_name="bar",
                                                description="The bar tenant",
                                                enabled=True)
+
+
+def test_ensure_tenant_exists_when_absent_check():
+    """ ensure_tenant_exists when tenant does not exist, check mode """
+    # Setup
+    keystone = setup_tenant_user_role()
+    keystone.tenants.create = mock.Mock(return_value=mock.Mock(
+        id="7c310f797aa045898e2884a975ab32ab"))
+    check_mode = True
+
+    # Code under test
+    (changed, id) = keystone_user.ensure_tenant_exists(keystone, "bar",
+                    "The bar tenant", check_mode)
+
+    # Assertions
+    assert changed
+    assert_equal(id, None)
+    assert not keystone.tenants.create.called
 
 
 def test_ensure_user_exists_when_present():

@@ -118,7 +118,7 @@ def ensure_tenant_exists(keystone, tenant_name, tenant_description,
 
     # We now know we will have to create a new tenant
     if check_mode:
-        return (True, get_tenant_id(keystone, tenant_name))
+        return (True, None)
 
     ks_tenant = keystone.tenants.create(tenant_name=tenant_name,
                                         description=tenant_description,
