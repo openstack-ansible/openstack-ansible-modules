@@ -81,15 +81,20 @@ def get_tenant_id(keystone, tenant):
 
 
 def ensure_tenant_exists(keystone, tenant, tenant_description, check_mode):
-    """ Check if tenant exists.
+    """ Ensure that a tenant exists.
 
         Return (True, id) if a new tenant was created, (False, None) if it
         already existed.
     """
 
     # Check if tenant already exists
-    if tenant_exists(keystone, tenant):
-        return (False, None)
+    try:
+        id = get_tenant_id(keystone, tenant)
+    except KeyError:
+        # Tenant doesn't exist yet
+        pass
+    else:
+        return (False, id)
 
     # We now know we will have to create a new tenant
     if check_mode:
@@ -99,6 +104,20 @@ def ensure_tenant_exists(keystone, tenant, tenant_description, check_mode):
                                         description=tenant_description,
                                         enabled=True)
     return (True, ks_tenant.id)
+
+
+def ensure_tenant_removed(keystone, tenant, check_mode):
+    """ Ensure that a tenant does not exist
+
+         Return True if the tenant was removed, False if it didn't exist
+         in the first place
+    """
+    if not tenant_exists(keystone, tenant):
+        return False
+
+    # We now know we will have to delete the tenant
+    if check_mode:
+        return True
 
 
 def ensure_user_exists(keystone, user, password, email, tenant, check_mode):
@@ -183,10 +202,13 @@ def main():
                 changed, id = ensure_tenant_exists(keystone, tenant,
                                                    tenant_description,
                                                    check_mode)
+            elif state == 'absent':
+                ensure_tenant_removed(keystone, tenant, check_mode)
 
     module.exit_json(
         changed=changed, id=id)
 
 # this is magic, see lib/ansible/module_common.py
 #<<INCLUDE_ANSIBLE_MODULE_COMMON>>
-main()
+if __name__ == '__main__':
+    main()
