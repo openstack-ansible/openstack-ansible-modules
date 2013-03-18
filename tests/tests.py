@@ -107,15 +107,33 @@ def test_dispatch_user_present(mock_ensure_user_exists):
                                        "0a6f3697fc314279b1a22c61d40c0919")
 
     # Code under test
-    res = keystone_user.dispatch(keystone, tenant="foo", user="admin",
+    res = keystone_user.dispatch(keystone, tenant="foo", user="root",
                                  email="admin@example.com",
                                  password="12345")
 
     # Assertions
-    mock_ensure_user_exists.assert_called_with(keystone, "admin",
+    mock_ensure_user_exists.assert_called_with(keystone, "root",
                                                "12345", "admin@example.com",
                                                "foo", False)
 
     assert_equal(res,
         dict(changed=True, id="0a6f3697fc314279b1a22c61d40c0919"))
+
+
+@mock.patch('keystone_user.ensure_role_exists')
+def test_dispatch_role_present(mock_ensure_role_exists):
+    """ dispatch with tenant, user and role"""
+    keystone = setup_foo_tenant()
+    mock_ensure_role_exists.return_value = (True,
+                                       "7df22b53d9c4405f92032c802178a31e")
+
+    # Code under test
+    res = keystone_user.dispatch(keystone, tenant="foo", user="root",
+                                 role="admin")
+
+    # Assertions
+    mock_ensure_role_exists.assert_called_with(keystone, "root",
+                                               "foo", "admin")
+    assert_equal(res,
+        dict(changed=True, id="7df22b53d9c4405f92032c802178a31e"))
 
