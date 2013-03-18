@@ -7,6 +7,14 @@ These will eventually be a dependency of the [openstack-ansible][1] repo for doi
 [1]: http://github.com/lorin/openstack-ansible
 
 ## Not yet supported
-- Disabling tenants
+- Disabled tenants
 - Deleting users
 - Deleting roles
+- Deleting services
+- Deleting endpoints
+- Multiple endpoints per service
+
+
+## Will probably never be supported
+- Non-unique names for tenants, users, roles, and services
+
