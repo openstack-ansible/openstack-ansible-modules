@@ -60,7 +60,11 @@ def get_endpoint(keystone, name):
 
 def ensure_service_present(keystone, name, service_type, description,
                            check_mode):
-    """ Ensure the service is present and has the right values"""
+    """ Ensure the service is present and has the right values
+
+        Returns a pair, where the first element is a boolean that indicates
+        a state change, and the second element is the service uuid, or None
+        if running in check mode"""
     service = None
     try:
         service = get_service(keystone, name)
@@ -143,13 +147,29 @@ def dispatch(keystone, name, service_type, description, public_url,
              internal_url, admin_url, region, state, check_mode):
 
     if state == 'present':
-        ensure_service_present(keystone, name, service_type, description,
-                               check_mode)
-        ensure_endpoint_present(keystone, name, public_url, internal_url,
-                                admin_url, region, check_mode)
+        (service_changed, service_id) = ensure_service_present(keystone,
+                                                              name,
+                                                              service_type,
+                                                              description,
+                                                              check_mode)
+
+        (sendpoint_changed, endpoint_id) = ensure_endpoint_present(
+            keystone,
+            name,
+            public_url,
+            internal_url,
+            admin_url,
+            region,
+            check_mode)
+        return dict(changed=service_changed or endpoint_changed,
+                    service_id=service_id,
+                    endpoint_id=endpoint_id)
     elif state == 'absent':
-        ensure_endpoint_absent(keystone, name, check_mode)
-        ensure_service_absent(keystone, name, check_mode)
+        endpoint_changed = ensure_endpoint_absent(keystone, name, check_mode)
+        service_changed = ensure_service_absent(keystone, name, check_mode)
+        return dict(changed=service_changed or endpoint_changed)
+    else:
+        raise ValueError("Code should never reach here")
 
 
 

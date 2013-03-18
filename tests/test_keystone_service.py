@@ -1,7 +1,7 @@
 import keystone_service
 import mock
-from nose.tools import assert_equal, assert_is_none
-from nose.plugins.skip import SkipTest
+from nose.tools import assert_equal, assert_list_equal, assert_is_none
+from nose import SkipTest
 
 
 def setup():
@@ -32,6 +32,8 @@ def test_dispatch_service_present(mock_ensure_service_present,
                                   mock_ensure_endpoint_absent):
     """ Dispatch: service present """
     # Setup
+    mock_ensure_service_present.return_value = (True, None)
+    mock_ensure_endpoint_present.return_value = (True, None)
     manager = mock.MagicMock()
     manager.attach_mock(mock_ensure_service_present, 'ensure_service_present')
     manager.attach_mock(mock_ensure_service_absent, 'ensure_service_absent')
@@ -79,6 +81,8 @@ def test_dispatch_service_absent(mock_ensure_service_present,
                                   mock_ensure_endpoint_absent):
     """ Dispatch: service absent """
     # Setup
+    mock_ensure_service_absent.return_value = True
+    mock_ensure_endpoint_absent.return_value = True
     manager = mock.MagicMock()
     manager.attach_mock(mock_ensure_service_present, 'ensure_service_present')
     manager.attach_mock(mock_ensure_service_absent, 'ensure_service_absent')
@@ -107,7 +111,7 @@ def test_dispatch_service_absent(mock_ensure_service_present,
         mock.call.ensure_service_absent(keystone, name, check_mode)
     ]
 
-    assert_equal(manager.mock_calls, expected_calls)
+    assert_list_equal(manager.mock_calls, expected_calls)
 
 
 def test_ensure_service_present_when_present():
