@@ -186,7 +186,7 @@ def main():
     internal_url = module.params['internal_url']
     if internal_url is None:
         internal_url = public_url
-    admin_url = modules.params['admin_url']
+    admin_url = module.params['admin_url']
     if admin_url is None:
         admin_url = public_url
     region = module.params['region']
