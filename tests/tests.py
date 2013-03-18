@@ -77,7 +77,7 @@ def test_ensure_user_exists_when_present():
     # Setup
     keystone = setup_foo_tenant()
 
-    # Code udner test
+    # Code under test
     (changed, id) = keystone_user.ensure_user_exists(keystone,
                                  user_name="johndoe",
                                  password="12345",
@@ -90,8 +90,24 @@ def test_ensure_user_exists_when_present():
     assert_equal(id, "24073d9426ab4bc59527955d7c486179")
 
 
-def test_ensure_user_exists_when_absent():
-    raise SkipTest("Not yet implemented")
+@mock.patch('keystone_user.ensure_user_exists')
+def test_ensure_user_exists_when_absent(mock_ensure_user_exists):
+    # Setup
+    keystone = setup_foo_tenant()
+    mock_ensure_user_exists.return_value = (True,
+                                       "1e31370740a14668a2d3267c39c7af07")
+
+    # Code under test
+    (changed, id) = keystone_user.ensure_user_exists(keystone,
+                                 user_name="skippyjonjones",
+                                 password="1234567",
+                                 email="sjj@example.com",
+                                 tenant_name="foo",
+                                 check_mode=False)
+
+    # Assertions
+    assert changed
+    assert_equal(id, "1e31370740a14668a2d3267c39c7af07")
 
 
 def test_ensure_role_exists_when_present():
