@@ -125,10 +125,11 @@ def ensure_tenant_removed(keystone, tenant, check_mode):
 def ensure_user_exists(keystone, user, password, email, tenant, check_mode):
     """ Check if user exists
 
-        Return True if a new user was created, False user alrady existed
+        Return (True, id) if a new user was created, (False, id) user alrady
+        exists
     """
 
-    # Check if user alrady exists
+    # Check if user already exists
     if user_exists(keystone, user):
         return (False, None)
 
