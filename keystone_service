@@ -198,8 +198,9 @@ def main():
     check_mode = module.check_mode
 
     try:
-        d = dispatch(keystone, name, service_type, description, region,
-                public_url, internal_url, admin_url, region, state, check_mode)
+        d = dispatch(keystone, name, service_type, description,
+                     public_url, internal_url, admin_url, region, state,
+                     check_mode)
     except Exception:
         if check_mode:
             # If we have a failure in check mode
