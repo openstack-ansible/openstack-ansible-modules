@@ -50,10 +50,27 @@ def test_ensure_tenant_exists_when_present():
 
     # Setup
     keystone = setup_tenant_user_role()
+    check_mode = False
 
     # Code under test
     (changed, id) = keystone_user.ensure_tenant_exists(keystone, "acme",
-                    "The acme tenant", False)
+                    "The acme tenant", check_mode)
+
+    # Assertions
+    assert not changed
+    assert_equal(id, "21b505b9cbf84bdfba60dc08cc2a4b8d")
+
+
+def test_ensure_tenant_exists_when_present_check():
+    """ ensure_tenant_exists when tenant does exists """
+
+    # Setup
+    keystone = setup_tenant_user_role()
+    check_mode = True
+
+    # Code under test
+    (changed, id) = keystone_user.ensure_tenant_exists(keystone, "acme",
+                    "The acme tenant", check_mode)
 
     # Assertions
     assert not changed
