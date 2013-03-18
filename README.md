@@ -12,6 +12,10 @@ These will eventually be a dependency of the [openstack-ansible][1] repo for doi
 - Deleting roles
 - Deleting services
 - Deleting endpoints
+- Updating tenants
+- Updating users
+- Updating services
+- Updating endpoints
 - Multiple endpoints per service
 
 
