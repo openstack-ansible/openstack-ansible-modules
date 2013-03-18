@@ -19,6 +19,11 @@ def setup_tenant_user_role():
     user.name = "johndoe"
     keystone.users.list = mock.Mock(return_value=[user])
 
+    role = mock.Mock()
+    role.id = "34a699ab89d04c38894bbf3d998e5229"
+    role.name = "admin"
+    keystone.roles.list = mock.Mock(return_value=[role])
+
     return keystone
 
 
@@ -112,8 +117,24 @@ def test_ensure_user_exists_when_absent(mock_ensure_user_exists):
 
 
 def test_ensure_role_exists_when_present():
-    raise SkipTest("Not yet implemented")
+    # Setup
+    keystone = setup_tenant_user_role()
+    role = mock.Mock()
+    role.id = "34a699ab89d04c38894bbf3d998e5229"
+    role.name = "admin"
+    keystone.roles.roles_for_user = mock.Mock(return_value=[role])
 
+    # Code under test
+    user = "johndoe"
+    tenant = "acme"
+    role = "admin"
+    check_mode = False
+    (changed, id) = keystone_user.ensure_role_exists(keystone, user, tenant,
+                                                     role, check_mode)
+
+    # Assertions
+    assert not changed
+    assert_equal(id, "34a699ab89d04c38894bbf3d998e5229")
 
 def test_ensure_role_exists_when_absent():
     raise SkipTest("Not yet implemented")
