@@ -1,6 +1,6 @@
 import keystone_user
 import mock
-from nose.tools import assert_equal
+from nose.tools import assert_equal, assert_is_none
 from nose.plugins.skip import SkipTest
 
 
@@ -111,7 +111,7 @@ def test_ensure_tenant_exists_when_absent_check():
 
     # Assertions
     assert changed
-    assert_equal(id, None)
+    assert_is_none(id)
     assert not keystone.tenants.create.called
 
 
@@ -154,14 +154,15 @@ def test_ensure_user_exists_when_present_check():
 
 
 def test_ensure_user_exists_when_absent():
+    """ ensure_user_exists when user does not exist"""
     # Setup
     keystone = setup_tenant_user_role()
     user = mock.Mock()
     user.id = "5ce4b6ef2e814a4897907cc6db879536"
     user.name = "skippyjonjones"
     user.email = "sjj@example.com"
-
     keystone.users.create = mock.Mock(return_value=user)
+    check_mode = False
 
     # Code under test
     (changed, id) = keystone_user.ensure_user_exists(keystone,
@@ -169,7 +170,7 @@ def test_ensure_user_exists_when_absent():
                                  password="1234567",
                                  email="sjj@example.com",
                                  tenant_name="acme",
-                                 check_mode=False)
+                                 check_mode=check_mode)
 
     # Assertions
     assert changed
@@ -181,19 +182,45 @@ def test_ensure_user_exists_when_absent():
         tenant_id='21b505b9cbf84bdfba60dc08cc2a4b8d')
 
 
+def test_ensure_user_exists_when_absent_check():
+    """ ensure_user_exists when user does not exist, check mode"""
+    # Setup
+    keystone = setup_tenant_user_role()
+    user = mock.Mock()
+    user.id = "5ce4b6ef2e814a4897907cc6db879536"
+    user.name = "skippyjonjones"
+    user.email = "sjj@example.com"
+    keystone.users.create = mock.Mock(return_value=user)
+    check_mode = True
+
+    # Code under test
+    (changed, id) = keystone_user.ensure_user_exists(keystone,
+                                 user_name="skippyjonjones",
+                                 password="1234567",
+                                 email="sjj@example.com",
+                                 tenant_name="acme",
+                                 check_mode=check_mode)
+
+    # Assertions
+    assert changed
+    assert_is_none(id)
+    assert not keystone.users.create.called
+
+
 def test_ensure_role_exists_when_present():
+    """ ensure_role_exists when role exists and is associated properly """
     # Setup
     keystone = setup_tenant_user_role()
     role = mock.Mock()
     role.id = "34a699ab89d04c38894bbf3d998e5229"
     role.name = "admin"
     keystone.roles.roles_for_user = mock.Mock(return_value=[role])
+    check_mode = False
 
     # Code under test
     user = "johndoe"
     tenant = "acme"
     role = "admin"
-    check_mode = False
     (changed, id) = keystone_user.ensure_role_exists(keystone, user, tenant,
                                                      role, check_mode)
 
@@ -202,6 +229,31 @@ def test_ensure_role_exists_when_present():
     assert_equal(id, "34a699ab89d04c38894bbf3d998e5229")
     assert not keystone.roles.create.called
 
+
+def test_ensure_role_exists_when_present_check():
+    """ ensure_role_exists when role exists and is associated properly,
+        check mode """
+    # Setup
+    keystone = setup_tenant_user_role()
+    role = mock.Mock()
+    role.id = "34a699ab89d04c38894bbf3d998e5229"
+    role.name = "admin"
+    keystone.roles.roles_for_user = mock.Mock(return_value=[role])
+    check_mode = True
+
+    # Code under test
+    user = "johndoe"
+    tenant = "acme"
+    role = "admin"
+    (changed, id) = keystone_user.ensure_role_exists(keystone, user, tenant,
+                                                     role, check_mode)
+
+    # Assertions
+    assert not changed
+    assert_equal(id, "34a699ab89d04c38894bbf3d998e5229")
+    assert not keystone.roles.create.called
+
+
 def test_ensure_role_exists_when_role_is_absent():
     """ ensure_role_exists when role does not exist yet """
     # Setup
@@ -209,12 +261,12 @@ def test_ensure_role_exists_when_role_is_absent():
     keystone.roles.create = mock.Mock(return_value=mock.Mock(
         id="40b14f9c2d114b38b3f6bced49a792b8"))
     keystone.roles.roles_for_user = mock.Mock(return_value=[])
+    check_mode = False
 
     # Code under test
     user = "johndoe"
     tenant = "acme"
     role = "webuser"
-    check_mode = False
     (changed, id) = keystone_user.ensure_role_exists(keystone, user, tenant,
                                                     role, check_mode)
 
@@ -223,17 +275,40 @@ def test_ensure_role_exists_when_role_is_absent():
     assert_equal(id, "40b14f9c2d114b38b3f6bced49a792b8")
     keystone.roles.create.assert_called_with("webuser")
 
+
+def test_ensure_role_exists_when_role_is_absent_check():
+    """ ensure_role_exists when role does not exist yet, check mode """
+    # Setup
+    keystone = setup_tenant_user_role()
+    keystone.roles.create = mock.Mock(return_value=mock.Mock(
+        id="40b14f9c2d114b38b3f6bced49a792b8"))
+    keystone.roles.roles_for_user = mock.Mock(return_value=[])
+    check_mode = True
+
+    # Code under test
+    user = "johndoe"
+    tenant = "acme"
+    role = "webuser"
+    (changed, id) = keystone_user.ensure_role_exists(keystone, user, tenant,
+                                                    role, check_mode)
+
+    # Assertions
+    assert changed
+    assert_equal(id, None)
+    assert not keystone.roles.create.called
+
+
 def test_ensure_role_exists_when_role_is_present_but_not_associated():
     """ ensure_role_exists when role exists but not associated yet """
     # Setup
     keystone = setup_tenant_user_role()
     keystone.roles.roles_for_user = mock.Mock(return_value=[])
+    check_mode = False
 
     # Code under test
     user = "johndoe"
     tenant = "acme"
     role = "admin"
-    check_mode = False
     (changed, id) = keystone_user.ensure_role_exists(keystone, user, tenant,
                                                     role, check_mode)
 
@@ -242,6 +317,26 @@ def test_ensure_role_exists_when_role_is_present_but_not_associated():
     assert_equal(id, "34a699ab89d04c38894bbf3d998e5229")
     assert not keystone.roles.create.called
 
+
+def test_ensure_role_exists_when_role_is_present_but_not_associated_check():
+    """ ensure_role_exists when role exists but not associated yet, check mode
+    """
+    # Setup
+    keystone = setup_tenant_user_role()
+    keystone.roles.roles_for_user = mock.Mock(return_value=[])
+    check_mode = True
+
+    # Code under test
+    user = "johndoe"
+    tenant = "acme"
+    role = "admin"
+    (changed, id) = keystone_user.ensure_role_exists(keystone, user, tenant,
+                                                    role, check_mode)
+
+    # Assertions
+    assert changed
+    assert_is_none(id)
+    assert not keystone.roles.create.called
 
 
 @mock.patch('keystone_user.ensure_tenant_exists')
