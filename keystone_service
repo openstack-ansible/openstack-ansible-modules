@@ -1,0 +1,69 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+DOCUMENTATION = '''
+---
+module: keystone_service
+short_description: Manage OpenStack Identity (keystone) service endpoints
+requirements: [ python-keystoneclinet ]
+examples:
+    - code: 'keystone_service: name=keystone type=identity description="Keystone Identity Service" publicurl=http://192.168.206.130:5000/v2.0 internalurl=http://192.168.206.130:5000/v2.0 adminurl=http://192.168.206.130:35357/v2.0'
+    - code: 'keystone_service: name=glance type=image description="Glance Identity Service" url=http://192.168.206.130:9292'
+author: Lorin Hochstein
+'''
+
+try:
+    from keystoneclient.v2_0 import client
+except ImportError:
+    keystoneclient_found = False
+else:
+    keystoneclient_found = True
+
+
+def authenticate(endpoint, token, login_user, login_password):
+    """Return a keystone client object"""
+
+    if token:
+        return client.Client(endpoint=endpoint, token=token)
+    else:
+        return client.Client(endpoint=endpoint, username=login_user,
+                             password=login_password)
+
+
+def main():
+
+    module = AnsibleModule(
+        argument_spec=dict(
+            name=dict(required=True),
+            type=dict(required=True),
+            description=dict(required=False),
+            publicurl=dict(required=True, aliases=['url']),
+            internalurl=dict(required=False),
+            adminurl=dict(required=False),
+            state=dict(default='present', choices=['present', 'absent']),
+            endpoint=dict(required=False,
+                          default="http://127.0.0.1:35357/v2.0"),
+            token=dict(required=False),
+            login_user=dict(required=False),
+            login_password=dict(required=False)
+        ),
+        supports_check_mode=True,
+        mutually_exclusive=[['token', 'login_user'],
+                            ['token', 'login_password']]
+    )
+
+    endpoint = module.params['endpoint']
+    token = module.params['token']
+    login_user = module.params['login_user']
+    login_password = module.params['login_password']
+
+
+    keystone = authenticate(endpoint, token, login_user, login_password)
+    check_mode = module.check_mode
+
+
+
+# this is magic, see lib/ansible/module_common.py
+#<<INCLUDE_ANSIBLE_MODULE_COMMON>>
+if __name__ == '__main__':
+    main()
