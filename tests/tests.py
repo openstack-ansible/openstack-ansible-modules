@@ -65,7 +65,6 @@ def test_ensure_tenant_exists_when_absent():
                                                enabled=True)
 
 
-
 def test_change_tenant_description():
     """ ensure_tenant_exists with a change in description """
     # Setup
@@ -80,4 +79,43 @@ def test_change_tenant_description():
     assert_equal(id, "21b505b9cbf84bdfba60dc08cc2a4b8d")
 
 
+@mock.patch('keystone_user.ensure_tenant_exists')
+def test_dispatch_tenant_present(mock_ensure_tenant_exists):
+    """ dispatch with tenant only"""
+    # Setup
+    keystone = setup_foo_tenant()
+    mock_ensure_tenant_exists.return_value = (True,
+                                       "34469137412242129cd908e384717794")
+
+    # Code under test
+    res = keystone_user.dispatch(keystone, tenant="bar",
+                           tenant_description="This is a bar")
+
+    # Assertions
+    mock_ensure_tenant_exists.assert_called_with(keystone, "bar",
+                                                "This is a bar", False)
+    assert_equal(res,
+        dict(changed=True, id="34469137412242129cd908e384717794"))
+
+
+@mock.patch('keystone_user.ensure_user_exists')
+def test_dispatch_user_present(mock_ensure_user_exists):
+    """ dispatch with tenant and user"""
+    # Setup
+    keystone = setup_foo_tenant()
+    mock_ensure_user_exists.return_value = (True,
+                                       "0a6f3697fc314279b1a22c61d40c0919")
+
+    # Code under test
+    res = keystone_user.dispatch(keystone, tenant="foo", user="admin",
+                                 email="admin@example.com",
+                                 password="12345")
+
+    # Assertions
+    mock_ensure_user_exists.assert_called_with(keystone, "admin",
+                                               "12345", "admin@example.com",
+                                               "foo", False)
+
+    assert_equal(res,
+        dict(changed=True, id="0a6f3697fc314279b1a22c61d40c0919"))
 
