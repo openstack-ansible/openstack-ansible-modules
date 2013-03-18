@@ -12,7 +12,7 @@ def setup():
     service.type = "identity"
     service.description = "Keystone Identity Service"
     keystone.services.list = mock.Mock(return_value=[service])
-    return service
+    return keystone
 
 
 @mock.patch('keystone_service.ensure_endpoints_absent')

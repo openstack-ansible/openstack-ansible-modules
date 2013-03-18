@@ -29,9 +29,48 @@ def authenticate(endpoint, token, login_user, login_password):
         return client.Client(endpoint=endpoint, username=login_user,
                              password=login_password)
 
+
+def get_service(keystone, name):
+    """ Retrieve a service by name """
+    services = [x for x in keystone.services.list() if x.name == name]
+    count = len(services)
+    if count == 0:
+        raise KeyError("No keystone services with name %s" % name)
+    elif count > 1:
+        raise ValueError("%d services with name %s" % (count, name))
+    else:
+        return services[0]
+
+
 def ensure_service_present(keystone, name, service_type, description, check_mode):
     """ Ensure the service is present and has the right values"""
-    raise NotImplementedError()
+    service = None
+    try:
+        service = get_service(keystone, name)
+    except:
+        # Service doesn't exist yet, we'll need to create one
+        pass
+    else:
+        # See if it matches exactly
+        if service.name == name and \
+           service.type == service_type and \
+           service.description==description:
+
+           # Same, no changes needed
+           return (False, service.id)
+
+    # At this point, we know we will need to make a change
+    if check_mode:
+        return (True, None)
+
+    if service is None:
+        service = keystone.services.create(name=name, service_type=service_type,
+                                           description=description)
+        return (True, service.id)
+    else:
+        msg ="keystone v2 API doesn't support updating service objects"
+        raise ValueError(msg)
+
 
 def ensure_endpoints_present(keystone, name, public_url, internal_url,
                              admin_url, check_mode):
