@@ -6,11 +6,18 @@ from nose.plugins.skip import SkipTest
 
 def setup_foo_tenant():
     keystone = mock.MagicMock()
+
     tenant = mock.Mock()
     tenant.id = "21b505b9cbf84bdfba60dc08cc2a4b8d"
     tenant.name = "foo"
     tenant.description = "The foo tenant"
     keystone.tenants.list = mock.Mock(return_value=[tenant])
+
+    user = mock.Mock()
+    user.id = "24073d9426ab4bc59527955d7c486179"
+    user.name = "johndoe"
+    keystone.users.list = mock.Mock(return_value=[user])
+
     return keystone
 
 
@@ -67,7 +74,20 @@ def test_ensure_tenant_exists_when_absent():
 
 
 def test_ensure_user_exists_when_present():
-    raise SkipTest("Not yet implemented")
+    # Setup
+    keystone = setup_foo_tenant()
+
+    # Code udner test
+    (changed, id) = keystone_user.ensure_user_exists(keystone,
+                                 user="johndoe",
+                                 password="12345",
+                                 email="johndoe@example.com",
+                                 tenant="foo",
+                                 check_mode=False)
+
+    # Assertions
+    assert not changed
+    assert_equal(id, "24073d9426ab4bc59527955d7c486179")
 
 
 def test_ensure_user_exists_when_absent():
