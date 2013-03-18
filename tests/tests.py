@@ -116,8 +116,10 @@ def test_ensure_tenant_exists_when_absent_check():
 
 
 def test_ensure_user_exists_when_present():
+    """ ensure_user_exists when user exists"""
     # Setup
     keystone = setup_tenant_user_role()
+    check_mode = False
 
     # Code under test
     (changed, id) = keystone_user.ensure_user_exists(keystone,
@@ -125,7 +127,26 @@ def test_ensure_user_exists_when_present():
                                  password="12345",
                                  email="johndoe@example.com",
                                  tenant_name="acme",
-                                 check_mode=False)
+                                 check_mode=check_mode)
+
+    # Assertions
+    assert not changed
+    assert_equal(id, "24073d9426ab4bc59527955d7c486179")
+
+
+def test_ensure_user_exists_when_present_check():
+    """ ensure_user_exists when user exists, check mode"""
+    # Setup
+    keystone = setup_tenant_user_role()
+    check_mode = True
+
+    # Code under test
+    (changed, id) = keystone_user.ensure_user_exists(keystone,
+                                 user_name="johndoe",
+                                 password="12345",
+                                 email="johndoe@example.com",
+                                 tenant_name="acme",
+                                 check_mode=check_mode)
 
     # Assertions
     assert not changed
