@@ -1,7 +1,6 @@
 import keystone_user
 import mock
 from nose.tools import assert_equal, assert_is_none
-from nose.plugins.skip import SkipTest
 
 
 def setup_tenant_user_role():
