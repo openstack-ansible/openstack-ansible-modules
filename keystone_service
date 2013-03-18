@@ -44,9 +44,9 @@ def get_service(keystone, name):
 
 def get_endpoint(keystone, name):
     """ Retrieve a service endpoint by name """
-    service = get_servce(keystone, name)
-    endpoints = [x for x in keystone.services.list()
-                  if x.service_id == service.id]
+    service = get_service(keystone, name)
+    endpoints = [x for x in keystone.endpoints.list()
+                   if x.service_id == service.id]
     count = len(endpoints)
     if count == 0:
         raise KeyError("No keystone endpoints with service name %s" % name)
