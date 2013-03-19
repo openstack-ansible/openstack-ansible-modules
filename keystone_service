@@ -153,7 +153,7 @@ def dispatch(keystone, name, service_type, description, public_url,
                                                               description,
                                                               check_mode)
 
-        (sendpoint_changed, endpoint_id) = ensure_endpoint_present(
+        (endpoint_changed, endpoint_id) = ensure_endpoint_present(
             keystone,
             name,
             public_url,
