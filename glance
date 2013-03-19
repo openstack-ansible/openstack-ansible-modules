@@ -37,7 +37,7 @@ options:
   region:
     description:
       - OpenStack region name
-    required: true
+    required: false
     aliases: [region_name]
   username:
     description:
@@ -123,7 +123,7 @@ def main():
             name=dict(required=True),
             file=dict(required=True, aliases=['path']),
             auth_url=dict(required=True),
-            region=dict(required=True, aliases=['region_name']),
+            region=dict(required=False, aliases=['region_name']),
             username=dict(required=True, aliases=['user',
                                                   'user_name',
                                                   'login_user']),
