@@ -38,6 +38,11 @@ You can use `url` as an alias for `public_url`. If you don't specify internal an
 
     keystone_service: token=$admin_token name=nova type=compute description="Compute Service" url=http://192.168.206.130:8774/v2/%(tenant_id)s
 
+## glance
+
+Add images
+
+    glance: name=cirros file=/tmp/cirros-0.3.0-x86_64-disk.img disk_format=qcow2 is_public=true user=admin tenant=demo password=secrete region=RegionOne auth_url=http://192.168.206.130:5000/v2.0
 
 ## Not yet supported
 - Disabled tenants
@@ -45,13 +50,15 @@ You can use `url` as an alias for `public_url`. If you don't specify internal an
 - Deleting roles
 - Deleting services
 - Deleting endpoints
+- Deleting images
 - Updating tenants
 - Updating users
 - Updating services
 - Updating endpoints
 - Multiple endpoints per service
+- Updating images
 
 
 ## Will probably never be supported
-- Non-unique names for tenants, users, roles, and services
+- Non-unique names for tenants, users, roles, services and images.
 
