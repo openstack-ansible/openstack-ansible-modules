@@ -14,6 +14,11 @@ Initialize the keystone database:
 
     keystone_manage: action=db_sync
 
+This is the equivalent of:
+
+    # keystone-manage db_sync
+
+
 ## keystone_user
 
 Manage users, tenants, and roles
@@ -39,6 +44,19 @@ Manage services and endpoints
 You can use `url` as an alias for `public_url`. If you don't specify internal and admin urls, they will default to the same value of public url. For example:
 
     keystone_service: token=$admin_token name=nova type=compute description="Compute Service" url=http://192.168.206.130:8774/v2/%(tenant_id)s
+
+
+## glance_manage
+
+Initialize the glance database:
+
+    glance_manage: action=db_sync
+
+This is the (idempotent) equivalent of:
+
+    # glance-manage version_control 0
+    # glance-manage db_sync
+
 
 ## glance
 
