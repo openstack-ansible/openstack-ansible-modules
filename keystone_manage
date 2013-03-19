@@ -5,6 +5,7 @@ DOCUMENTATION = '''
 ---
 module: keystone_manage
 short_description: Initialize OpenStack Identity (keystone) database
+description: Create the tables for the database backend used by keystone
 options:
   action:
     description:
@@ -17,7 +18,7 @@ options:
     default: /etc/keystone/keystone.conf
 requirements: [ keystone ]
 examples:
-    - code: keystone_manage action=dbsync
+    - code: 'keystone_manage action=dbsync'
 
 author: Lorin Hochstein
 '''
