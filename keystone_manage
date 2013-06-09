@@ -17,11 +17,13 @@ options:
     required: false
     default: /etc/keystone/keystone.conf
 requirements: [ keystone ]
-examples:
-    - code: 'keystone_manage action=dbsync'
-
 author: Lorin Hochstein
 '''
+
+EXAMPLES = '''
+keystone_manage: action=dbsync
+'''
+
 import subprocess
 
 try:

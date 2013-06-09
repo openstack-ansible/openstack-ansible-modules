@@ -5,11 +5,69 @@ DOCUMENTATION = '''
 ---
 module: keystone_service
 short_description: Manage OpenStack Identity (keystone) service endpoints
-requirements: [ python-keystoneclinet ]
-examples:
-    - code: 'keystone_service: name=keystone type=identity description="Keystone Identity Service" publicurl=http://192.168.206.130:5000/v2.0 internalurl=http://192.168.206.130:5000/v2.0 adminurl=http://192.168.206.130:35357/v2.0'
-    - code: 'keystone_service: name=glance type=image description="Glance Identity Service" url=http://192.168.206.130:9292'
+options:
+  name:
+    description:
+        - name of service (e.g., keystone)
+    required: yes
+  type:
+    description:
+        - type of service (e.g., identity)
+    required: yes
+  description:
+    description:
+        - description of service (e.g., Identity Service)
+    required: yes
+  public_url:
+    description:
+        - public url of service.
+        - 'Alias: I(url)'
+        - 'Alias: I(publicurl)'
+    required: yes
+  internal_url:
+    description:
+        - internal url of service.
+        - 'Alias: I(internalurl)'
+    required: no
+    default: value of public_url
+  admin_url:
+    description:
+        - admin url of service.
+        - 'Alias: I(adminurl)'
+    required: no
+    default: value of public_url
+  region:
+    description:
+        - region of service
+    required: yes
+   state:
+     description:
+        - Indicate desired state of the resource
+     choices: ['present', 'absent']
+     default: present
+
+
+
+requirements: [ python-keystoneclient ]
 author: Lorin Hochstein
+'''
+
+EXAMPLES = '''
+examples:
+keystone_service: >
+    name=keystone
+    type=identity
+    description="Keystone Identity Service"
+    publicurl=http://192.168.206.130:5000/v2.0
+    internalurl=http://192.168.206.130:5000/v2.0
+    adminurl=http://192.168.206.130:35357/v2.0
+
+keystone_service: >
+    name=glance
+    type=image
+    description="Glance Identity Service"
+    url=http://192.168.206.130:9292
+
 '''
 
 try:

@@ -17,9 +17,11 @@ options:
     required: false
     default: /etc/glance/glance-registry.conf
 requirements: [ glance ]
-examples:
-    - code: 'glance_manage action=dbsync'
 author: Lorin Hochstein
+'''
+
+EXAMPLES = '''
+glance_manage: action=dbsync
 '''
 
 try:

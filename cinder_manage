@@ -17,11 +17,13 @@ options:
     required: false
     default: /etc/cinder/cinder.conf
 requirements: [ cinder ]
-examples:
-    - code: 'cinder_manage action=dbsync'
-
 author: Lorin Hochstein
 '''
+
+EXAMPLES = '''
+cinder_manage: action=dbsync
+'''
+
 import subprocess
 
 try:
