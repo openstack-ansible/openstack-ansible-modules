@@ -36,6 +36,11 @@ options:
         - 'Alias: I(adminurl)'
     required: no
     default: value of public_url
+  insecure:
+    description:
+        - allow use of self-signed SSL certificates
+    required: no
+    choices: [ "yes", "no" ]
   region:
     description:
         - region of service
@@ -80,15 +85,14 @@ else:
 import traceback
 
 
-def authenticate(endpoint, token, login_user, login_password):
+def authenticate(endpoint, token, login_user, login_password, insecure):
     """Return a keystone client object"""
 
     if token:
-        return client.Client(endpoint=endpoint, token=token)
+        return client.Client(endpoint=endpoint, token=token, insecure=insecure)
     else:
         return client.Client(endpoint=endpoint, username=login_user,
-                             password=login_password)
-
+                             password=login_password, insecure=insecure)
 
 def get_service(keystone, name):
     """ Retrieve a service by name """
@@ -246,6 +250,8 @@ def main():
             endpoint=dict(required=False,
                           default="http://127.0.0.1:35357/v2.0"),
             token=dict(required=False),
+            insecure=dict(required=False, default=False, choices=BOOLEANS),
+
             login_user=dict(required=False),
             login_password=dict(required=False)
         ),
@@ -258,7 +264,7 @@ def main():
     token = module.params['token']
     login_user = module.params['login_user']
     login_password = module.params['login_password']
-
+    insecure = module.boolean(module.params['insecure'])
     name = module.params['name']
     service_type = module.params['type']
     description = module.params['description']
@@ -272,7 +278,7 @@ def main():
     region = module.params['region']
     state = module.params['state']
 
-    keystone = authenticate(endpoint, token, login_user, login_password)
+    keystone = authenticate(endpoint, token, login_user, login_password, insecure)
     check_mode = module.check_mode
 
     try:
