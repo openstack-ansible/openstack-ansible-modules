@@ -34,7 +34,6 @@ try:
     from glance.common.exception import DatabaseMigrationError
     from migrate.versioning import api as versioning_api
     import glance.db.sqlalchemy.api
-
 except ImportError:
     glance_found = False
 else:
