@@ -31,8 +31,8 @@ try:
     # https://bugs.launchpad.net/glance/+bug/885529
     from keystone.openstack.common import gettextutils
     gettextutils.install('keystone')
-except:
-    # this is not havana release
+except AttributeError:
+    # this is not havana
     pass
 
 try:
@@ -55,10 +55,10 @@ def will_db_change(conf):
     current_version = migration.db_version()
 
     # in havana the method _find_migrate_repo has been renamed to find_migrate_repo
-    if hasattr(migration, "find_migrate_repo"):
-      repo_path = migration.find_migrate_repo()
-    else:
-      repo_path = migration._find_migrate_repo()
+    try:
+        repo_path = migration.find_migrate_repo()
+    except AttributeError:
+        repo_path = migration._find_migrate_repo()
     repo_version = versioning_api.repository.Repository(repo_path).latest
     return current_version != repo_version
 

@@ -24,15 +24,11 @@ EXAMPLES = '''
 glance_manage: action=dbsync
 '''
 
-try:
-    import glance.db.sqlalchemy.api
-    # this is necessary starting from havana release due to bug 885529
-    # https://bugs.launchpad.net/glance/+bug/885529
-    from glance.openstack.common import gettextutils
-    gettextutils.install('glance')
-except:
-    # this is not havana release
-    pass
+# this is necessary starting from havana release due to bug 885529
+# https://bugs.launchpad.net/glance/+bug/885529
+from glance.openstack.common import gettextutils
+gettextutils.install('glance')
+import glance.db.sqlalchemy.api
 
 try:
     from glance.db.sqlalchemy import migration
