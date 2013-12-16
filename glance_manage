@@ -25,15 +25,19 @@ glance_manage: action=dbsync
 '''
 
 try:
+    import glance.db.sqlalchemy.api
     # this is necessary starting from havana release due to bug 885529
     # https://bugs.launchpad.net/glance/+bug/885529
     from glance.openstack.common import gettextutils
     gettextutils.install('glance')
+except:
+    # this is not havana release
+    pass
 
+try:
     from glance.db.sqlalchemy import migration
     from glance.common.exception import DatabaseMigrationError
     from migrate.versioning import api as versioning_api
-    import glance.db.sqlalchemy.api
 except ImportError:
     glance_found = False
 else:
