@@ -72,7 +72,7 @@ options:
      default: None
    provider_network_type:
      description:
-        - The type of the network to be created, gre, vlan, local. Available types depend on the plugin. The Neutron service decides if not specified.
+        - The type of the network to be created, gre, vxlan, vlan, local. Available types depend on the plugin. The Neutron service decides if not specified.
      required: false
      default: None
    provider_physical_network:
@@ -82,7 +82,7 @@ options:
      default: None
    provider_segmentation_id:
      description:
-        - The id that has to be assigned to the network, in case of vlan networks that would be vlan id and for gre the tunnel id
+        - The id that has to be assigned to the network, in case of vlan networks that would be vlan id, for gre the tunnel id and for vxlan the VNI.
      required: false
      default: None
    router_external:
@@ -206,6 +206,9 @@ def _create_network(module, neutron):
     if module.params['provider_network_type'] == 'gre':
         network.pop('provider:physical_network', None)
 
+    if module.params['provider_network_type'] == 'vxlan':
+        network.pop('provider:physical_network', None)
+
     if module.params['provider_network_type'] is None:
         network.pop('provider:network_type', None)
         network.pop('provider:physical_network', None)
@@ -236,7 +239,7 @@ def main():
             region_name = dict(default=None),
             name = dict(required=True),
             tenant_name = dict(default=None),
-            provider_network_type = dict(default=None, choices=['local', 'vlan', 'flat', 'gre']),
+            provider_network_type = dict(default=None, choices=['local', 'vlan', 'flat', 'gre', 'vxlan']),
             provider_physical_network = dict(default=None),
             provider_segmentation_id = dict(default=None),
             router_external = dict(default=False, type='bool'),
@@ -250,9 +253,9 @@ def main():
             if not module.params['provider_physical_network']:
                 module.fail_json(msg = " for vlan and flat networks, variable provider_physical_network should be set.")
 
-    if module.params['provider_network_type'] in ['vlan', 'gre']:
+    if module.params['provider_network_type'] in ['vlan', 'gre', 'vxlan']:
             if not module.params['provider_segmentation_id']:
-                module.fail_json(msg = " for vlan & gre networks, variable provider_segmentation_id should be set.")
+                module.fail_json(msg = " for vlan, gre & vxlan networks, variable provider_segmentation_id should be set.")
 
     neutron = _get_neutron_client(module, module.params)
 
