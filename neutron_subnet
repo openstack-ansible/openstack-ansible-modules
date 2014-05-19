@@ -105,6 +105,11 @@ options:
         - From the subnet pool the last IP that should be assigned to the virtual machines
      required: false
      default: None
+   host_routes:
+     description:
+        - Host routes for this subnet, list of dictionaries, e.g. [{destination: 0.0.0.0/0, nexthop: 123.456.78.9}, {destination: 192.168.0.0/24, nexthop: 192.168.0.1}]
+     required: false
+     default: None
 requirements: ["neutron", "keystoneclient"]
 '''
 
@@ -211,6 +216,7 @@ def _create_subnet(module, neutron):
             'dns_nameservers': module.params['dns_nameservers'],
             'network_id': _os_network_id,
             'cidr': module.params['cidr'],
+            'host_routes': module.params['host_routes'],
     }
     if module.params['allocation_pool_start'] and module.params['allocation_pool_end']:
         allocation_pools = [
@@ -226,6 +232,8 @@ def _create_subnet(module, neutron):
         subnet['dns_nameservers'] = module.params['dns_nameservers'].split(',')
     else:
         subnet.pop('dns_nameservers')
+    if not module.params['host_routes']:
+        subnet.pop('host_routes')
     try:
         new_subnet = neutron.create_subnet(dict(subnet=subnet))
     except Exception, e:
@@ -261,6 +269,7 @@ def main():
             dns_nameservers = dict(default=None),
             allocation_pool_start = dict(default=None),
             allocation_pool_end = dict(default=None),
+            host_routes = dict(default=None),
         ),
     )
     neutron = _get_neutron_client(module, module.params)
