@@ -45,14 +45,20 @@ options:
     aliases: [user, user_name, login_user]
   password:
     description:
-      - password to authenticate against Identiy service
+      - password to authenticate against Identity service
     aliases: [pass, login_password]
   tenant_name:
     description:
       - name of the tenant
+  endpoint_type:
+    description:
+      - endpoint URL type
+    choices: [publicURL, internalURL]
+    required: false
+    default: publicURL
 
 examples:
-  - code: 'glance: name=cirros file=/tmp/cirros.img format=qcow2 is_public=true auth_url=http://192.168.206.130:5000/v2.0/ username=admin tenant_name=demo password=secrete region=RegionOne '
+  - code: 'glance: name=cirros file=/tmp/cirros.img format=qcow2 is_public=true auth_url=http://192.168.206.130:5000/v2.0/ username=admin tenant_name=demo password=secrete region=RegionOne endpoint_type=publicURL '
 '''
 
 
@@ -66,7 +72,7 @@ else:
 
 
 def get_token_and_endpoint(auth_url, username, password, tenant_name,
-                           region_name):
+                           region_name, endpoint_type):
 
     keystone = ksclient.Client(username=username,
                                password=password,
@@ -75,16 +81,17 @@ def get_token_and_endpoint(auth_url, username, password, tenant_name,
                                region_name=region_name)
     glance_endpoint = keystone.service_catalog.url_for(
         service_type="image",
-        endpoint_type="publicURL")
+        endpoint_type=endpoint_type)
     return (keystone.auth_token, glance_endpoint)
 
 
 def authenticate(auth_url, username, password, tenant_name, region,
-                 version='1'):
+                 endpoint_type, version='1'):
     """Return a keystone client object"""
 
     (token, endpoint) = get_token_and_endpoint(auth_url, username, password,
-                                               tenant_name, region)
+                                               tenant_name, region,
+                                               endpoint_type)
 
     return Client(version, endpoint=endpoint, token=token)
 
@@ -135,7 +142,10 @@ def main():
                         aliases=['disk-format', 'format']),
             is_public=dict(required=False,
                            default=False,
-                           aliases=['public'])
+                           aliases=['public']),
+            endpoint_type=dict(required=False,
+                               choices=['publicURL', 'internalURL'],
+                               default='publicURL')
         ),
         supports_check_mode=True
     )
@@ -149,9 +159,11 @@ def main():
     tenant_name = module.params['tenant_name']
     disk_format = module.params['disk_format']
     is_public = module.params['is_public']
+    endpoint_type = module.params['endpoint_type']
     check_mode = module.check_mode
 
-    glance = authenticate(auth_url, username, password, tenant_name, region)
+    glance = authenticate(auth_url, username, password, tenant_name, region,
+                          endpoint_type)
 
     (changed, id) = create_image(glance, name, path, disk_format, is_public,
                                  check_mode)
