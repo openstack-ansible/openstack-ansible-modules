@@ -211,8 +211,7 @@ def _update_sg(module, network_client, sg):
     # Security rules group update
     # We keep things simple: first remove all rules, then insert the new
     # rules. Not terribly efficient, but easy to implement.
-    existing_rules = network_client.list_security_group_rules(sg['id'])
-    existing_rules = existing_rules['security_group_rules']
+    existing_rules = sg['security_group_rules']
 
     for rule in existing_rules:
         network_client.delete_security_group_rule(rule['id'])
