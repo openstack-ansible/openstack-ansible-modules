@@ -1,0 +1,188 @@
+#!/usr/bin/python
+#coding: utf-8 -*-
+
+# (c) 2014, Adam Samalik <asamalik@redhat.com>
+#
+# This module is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this software. If not, see <http://www.gnu.org/licenses/>.
+
+try:
+    from novaclient import client
+    from keystoneclient.v2_0 import client as ksclient
+except ImportError:
+    print("failed=True msg='novaclient and keystone client are required'")
+
+DOCUMENTATION = '''
+---
+module: nova_flavor
+short_description: Manage OpenStack flavours
+description:
+    - Create VM flavours with OpenStack Nova service
+requirements: [ python-novaclient ]
+options:
+  login_username:
+    description:
+      - user name to authenticate against Identity service
+    required: True
+    aliases: [username]
+  login_password:
+    description:
+      - password to authenticate against Identity service
+    aliases: [password]
+    required: True
+  login_tenant_name:
+    description:
+      - tenant name of the login user
+    aliases: [tenant_name]
+    required: True
+  auth_url:
+    description:
+      - The keystone URL for authentication
+    required: false
+    default: 'http://127.0.0.1:35357/v2.0/'
+  region_name:
+    description:
+      - Name of the region
+    required: False
+    default: None
+  name:
+    description:
+      - Descriptive name of the flavor
+    required: True
+  ram:
+    description:
+      - Memory in MB for the flavor
+    required: True
+  vcpus:
+    description:
+      - Number of VCPUs for the flavor
+    required: True
+  disk:
+    description:
+      - Size of local disk in GB
+    required: True
+  swap:
+    description:
+      - Swap space in MB
+    required: False
+    default: 0
+  id:
+    description:
+      - ID for the flavor (optional).
+    required: False
+    default: ID will be automatically generated
+  is_public:
+    description:
+      - Decide if the flavour is public
+'''
+
+EXAMPLES = '''
+  - nova_flavor:
+      login_username: admin
+      login_password: 1234
+      login_tenant_name: admin
+      name: medium
+      ram: 2048
+      vcpus: 2
+      disk: 20
+'''
+
+
+def authenticate(module, auth_url, username, password, tenant_name, region):
+    """
+    Return a Nova client object.
+    """
+    try:
+        keystone = ksclient.Client(auth_url=auth_url,
+                                   username=username,
+                                   password=password,
+                                   tenant_name=tenant_name,
+                                   region=region)
+    except Exception as e:
+        module.fail_json(
+            msg = "Could not authenticate with Keystone: {}".format(
+                e.message))
+
+    try:
+        nova = client.Client('2', keystone.username,
+                                  keystone.password,
+                                  keystone.tenant_name,
+                                  keystone.auth_url)
+    except Exception as e:
+        module.fail_json(msg = "Could not get Nova client: {}".format(
+            e.message))
+
+    return nova
+
+def get_flavors(nova, name, id=None):
+    if not id:
+        flavors = [x for x in nova.flavors.list() if x.name == name]
+    else:
+        flavors = [x for x in nova.flavors.list() if x.name == name and x.id == str(id)]
+    return flavors
+
+def create_flavor(module, nova, name, ram, vcpus, disk, swap, id, is_public):
+    flavors = get_flavors(nova, name, id)
+    if len(flavors) >0:
+        return False, flavors[0].id
+
+    try:
+        flavor = nova.flavors.create(name, ram, vcpus, disk, swap=swap,
+                                     flavorid=id, is_public=is_public)
+    except Exception as e:
+        module.fail_json(msg = "Could not create a flavour: {}".format(
+            e.message))
+
+    return True, flavor.id
+
+def main():
+    module = AnsibleModule(
+        argument_spec = dict(
+            login_username = dict(default='admin', aliases=["username"]),
+            login_password = dict(required=True, aliases=["password"]),
+            login_tenant_name = dict(required='True', aliases=["tenant_name"]),
+            auth_url = dict(default='http://127.0.0.1:35357/v2.0/'),
+            region_name = dict(default=None),
+            name = dict(required=True),
+            ram = dict(required=True),
+            vcpus = dict(required=True),
+            disk = dict(required=True),
+            swap = dict(default=0),
+            id = dict(default=None),
+            is_public = dict(default=True, choices=BOOLEANS),
+        )
+    )
+    auth_url = module.params['auth_url']
+    region = module.params['region_name']
+    username = module.params['login_username']
+    password = module.params['login_password']
+    tenant_name = module.params['login_tenant_name']
+    name = module.params['name']
+    ram = module.params['ram']
+    vcpus = module.params['vcpus']
+    disk = module.params['disk']
+    swap = module.params['swap']
+    id = module.params['id']
+    is_public = module.params['is_public']
+
+    nova = authenticate(module, auth_url, username, password, tenant_name, region)
+
+    changed, id = create_flavor(module, nova, name, ram, vcpus, disk, swap, id,
+                                is_public)
+
+    module.exit_json(changed=changed, name=name, id=id)
+
+# this is magic, see lib/ansible/module_common.py
+#<<INCLUDE_ANSIBLE_MODULE_COMMON>>
+if __name__ == '__main__':
+    main()
