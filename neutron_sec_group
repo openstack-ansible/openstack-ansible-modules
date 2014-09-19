@@ -15,12 +15,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this software. If not, see <http://www.gnu.org/licenses/>.
 
-try:
-    import neutronclient.v2_0.client
-    import keystoneclient.v2_0.client
-except ImportError:
-    print "failed=True msg='neutronclient and keystoneclient are required'"
-
 DOCUMENTATION = '''
 ---
 module: neutron_sec_group
@@ -87,22 +81,26 @@ neutron_sec_group:
   description: "Description of the security group"
   state: "present"
   rules:
-    - { direction: "ingress",
-        port_range_min: "80",
-        port_range_max: "80",
-        ethertype: "IPv4",
-        protocol: "tcp",
-        remote_ip_prefix: "10.0.0.1/24"
-      }
-    - { direction: "ingress",
-        port_range_min: "22",
-        port_range_max: "22",
-        ethertype: "IPv4",
-        protocol: "tcp",
-        remote_ip_prefix: "10.0.0.1/24"
-      }
+    - direction: "ingress"
+      port_range_min: "80"
+      port_range_max: "80"
+      ethertype: "IPv4"
+      protocol: "tcp"
+      remote_ip_prefix: "10.0.0.1/24"
+    - direction: "ingress"
+      port_range_min: "22"
+      port_range_max: "22"
+      ethertype: "IPv4"
+      protocol: "tcp"
+      remote_ip_prefix: "10.0.0.1/24"
 '''
 
+try:
+    import neutronclient.v2_0.client
+    import keystoneclient.v2_0.client
+    from neutronclient.common import exceptions
+except ImportError:
+    print "failed=True msg='neutronclient and keystoneclient are required'"
 
 def main():
     """
@@ -124,12 +122,22 @@ def main():
     )
     network_client = _get_network_client(module.params)
     identity_client = _get_identity_client(module.params)
+
     try:
         # Get id of security group (as a result check whether it exists)
-        sec_groups = network_client.list_security_groups()["security_groups"]
-        sec_group = next((sg for sg in sec_groups
-                          if sg["name"] == module.params['name']), None)
-        sec_group_exists = True if sec_group else False
+        params = {
+          'name': module.params['name'],
+          'tenant_id': _get_tenant_id(module, identity_client),
+          'fields': 'id'
+        }
+        sec_groups = network_client.list_security_groups(**params)["security_groups"]
+        if len(sec_groups) > 1:
+          raise exceptions.NeutronClientNoUniqueMatch(resource='security_group',name=name)
+        elif len(sec_groups) == 0:
+          sec_group_exists = False
+        else:
+          sec_group = sec_groups[0]
+          sec_group_exists = True
 
         # state=present -> create or update depending on whether sg exists.
         if module.params['state'] == "present":
@@ -148,9 +156,10 @@ def main():
 
         module.exit_json(changed=False)
 
-    except Exception, e:
-        _handle_exception(module, e)
-
+    except exceptions.Unauthorized as exc:
+        module.fail_json(msg="Authentication error: %s" % str(exc))
+    except Exception as exc:
+        module.fail_json(msg="Error: %s" % str(exc))
 
 def _delete_sg(module, network_client, sec_group):
     """
@@ -179,9 +188,9 @@ def _create_sg(module, network_client, identity_client):
         "security_group": {
             "name": module.params['name'],
             "description": module.params['description'],
+            'tenant_id': _get_tenant_id(module, identity_client)
         }
     }
-    _add_tenant_id(identity_client, module.params, data['security_group'])
 
     sg = network_client.create_security_group(data)
     sg = sg["security_group"]
@@ -242,38 +251,29 @@ def _create_sg_rules(network_client, sg, rules):
     return sg
 
 
-def _handle_exception(module, e):
+def _get_tenant_id(module, identity_client):
     """
-    Convenience method to deal with exceptions.
-    :param module: module object
-    :param e: exception to deal with
-    """
-    if type(e) is neutronclient.common.exceptions.Unauthorized:
-        module.fail_json(msg="Authenticated error: %s" % str(e))
-    else:
-        module.fail_json(msg="An error occured: %s" % str(e))
-
-
-def _add_tenant_id(identity_client, module_params, data):
-    """
-    Adds the tenant_id to the given data dictionary if tenant_name
-    is specified in the module params.
-    :param: identity_client: identity_client used to get the tenant_id from its
-    name.
+    Returns the tenant_id, given tenant_name.
+    if tenant_name is not specified in the module params uses login_tenant_name
+    :param identity_client: identity_client used to get the tenant_id from its
+           name.
     :param module_params: module parameters.
-    :param data: data dictionary to add tenant id to.
     """
-    tenant_name = module_params.get('tenant_name')
-    if tenant_name:
-        tenant = _get_tenant(identity_client, tenant_name)
-        data['tenant_id'] = tenant.id
+    if not module.params['tenant_name']:
+        tenant_name = module.params['login_tenant_name']
+    else:
+        tenant_name = module.params['tenant_name']
+
+    tenant = _get_tenant(identity_client, tenant_name)
+
+    return tenant.id
 
 
 def _get_tenant(identity_client, tenant_name):
     """
     Returns the tenant, given the tenant_name.
-    :param: identity_client: identity client to use to do the required requests.
-    :param: tenant_name: name of the tenant.
+    :param identity_client: identity client to use to do the required requests.
+    :param tenant_name: name of the tenant.
     :return: tenant for which the name was given.
     """
     tenants = identity_client.tenants.list()
