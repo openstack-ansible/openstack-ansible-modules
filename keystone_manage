@@ -36,12 +36,18 @@ except AttributeError:
     pass
 
 try:
-    from keystone.common.sql import migration
+    from keystone.common import sql
     from migrate.versioning import api as versioning_api
 except ImportError:
     keystone_found = False
 else:
     keystone_found = True
+
+try:
+    # for icehouse
+    from keystone.common.sql import migration_helpers as migration
+except ImportError:
+    pass
 
 
 def will_db_change(conf):
@@ -51,8 +57,14 @@ def will_db_change(conf):
 
     """
     # Load the config file options
-    migration.CONF(project='keystone', default_config_files=[conf])
-    current_version = migration.db_version()
+    try:
+        # before icehouse
+        sql.migration.CONF(project='keystone', default_config_files=[conf])
+        current_version = sql.migration.db_version()
+    except AttributeError:
+        # starting with icehouse
+        sql.core.CONF(project='keystone', default_config_files=[conf])
+        current_version = migration.get_db_version()
 
     # in havana the method _find_migrate_repo has been renamed to find_migrate_repo
     try:
