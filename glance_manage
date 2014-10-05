@@ -24,22 +24,38 @@ EXAMPLES = '''
 glance_manage: action=dbsync
 '''
 
+import glance
 # this is necessary starting from havana release due to bug 885529
 # https://bugs.launchpad.net/glance/+bug/885529
 from glance.openstack.common import gettextutils
 gettextutils.install('glance')
 import glance.db.sqlalchemy.api
 
+glance_found = True
 try:
     from glance.db.sqlalchemy import migration
     from glance.common.exception import DatabaseMigrationError
     from migrate.versioning import api as versioning_api
 except ImportError:
-    glance_found = False
-else:
-    glance_found = True
+    try:
+        # Icehouse imports
+        from glance.openstack.common.db.sqlalchemy import migration
+        from glance.openstack.common.db import options
+        migration.CONF = options.CONF
+        from migrate.versioning import api as versioning_api
 
+        # Dummy class to make sure that the rest of the code can work whether
+        # we're using icehouse or not
+        class DatabaseMigrationError:
+            pass
+    except ImportError:
+        glance_found = False
+
+
+import os
 import subprocess
+
+import sqlalchemy
 
 def is_under_version_control(conf):
     """ Return true if the database is under version control"""
@@ -48,7 +64,9 @@ def is_under_version_control(conf):
         migration.db_version()
     except DatabaseMigrationError:
         return False
-    else:
+    # db_version() will fail with TypeError on icehouse. Icehouse uses db
+    # migration so we're good.
+    finally:
         return True
 
 
@@ -58,8 +76,15 @@ def will_db_change(conf):
     if not is_under_version_control(conf):
         return True
     migration.CONF(project='glance', default_config_files=[conf])
-    current_version = migration.db_version()
-    repo_path = migration.get_migrate_repo_path()
+    try:
+        repo_path = migration.get_migrate_repo_path()
+        current_version = migration.db_version()
+    except AttributeError:
+        # icehouse
+        repo_path = os.path.join(os.path.dirname(glance.__file__),
+                                 'db', 'sqlalchemy', 'migrate_repo')
+        engine = sqlalchemy.create_engine(migration.CONF.database.connection)
+        current_version = migration.db_version(engine, repo_path, 0)
     repo_version = versioning_api.repository.Repository(repo_path).latest
     return current_version != repo_version
 
