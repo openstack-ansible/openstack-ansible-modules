@@ -26,19 +26,22 @@ cinder_manage: action=dbsync
 
 import subprocess
 
+cinder_found = True
 try:
     from cinder.db.sqlalchemy import migration
-    from cinder import flags
+    try:
+        from cinder import flags
+        FLAGS = flags.FLAGS
+    except ImportError:
+        # Starting with icehouse
+        import cinder.common.config
+        FLAGS = cinder.common.config.CONF
 except ImportError:
     cinder_found = False
-else:
-    cinder_found = True
 
 
 def load_config_file(conf):
-    flags.FLAGS(args=[], project='cinder',
-                default_config_files=[conf])
-
+    FLAGS(args=[], project='cinder', default_config_files=[conf])
 
 def will_db_change():
     """ Check if the database version will change after the sync.
