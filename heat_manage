@@ -17,7 +17,7 @@ options:
     required: false
     default: /etc/heat/heat.conf
 requirements: [ python-heatclient ]
-author: Lorin Hochstein, Gauvain Pocentek
+author: Gauvain Pocentek
 '''
 
 EXAMPLES = '''
