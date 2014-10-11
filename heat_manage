@@ -30,6 +30,7 @@ try:
     import heat
     from heat.db.sqlalchemy import migration
     from migrate.versioning import api as versioning_api
+    from heat.db import api
     from oslo.config import cfg
 except ImportError:
     heat_found = False
@@ -45,7 +46,10 @@ def will_db_change(conf):
     """
     # Load the config file options
     cfg.CONF(project='heat', default_config_files=[conf])
-    current_version = migration.db_version()
+    try:
+        current_version = migration.db_version()
+    except TypeError:  # juno
+        current_version = api.db_version(api.get_engine())
 
     repo_path = os.path.join(os.path.dirname(heat.__file__),
                              'db', 'sqlalchemy', 'migrate_repo')
