@@ -24,42 +24,45 @@ EXAMPLES = '''
 glance_manage: action=dbsync
 '''
 
-import glance
+import os
+import subprocess
+import sys
+
+try:
+    import glance
+    import sqlalchemy
+except ImportError:
+    print("failed=True msg='glance is not installed'")
+    sys.exit(1)
+
+from glance.version import version_info
 # this is necessary starting from havana release due to bug 885529
 # https://bugs.launchpad.net/glance/+bug/885529
 from glance.openstack.common import gettextutils
 gettextutils.install('glance')
 import glance.db.sqlalchemy.api
 
-glance_found = True
-try:
+glance_version = version_info.version
+
+if glance_version.startswith('2014.2'):
+    from oslo.config.cfg import CONF
+    from oslo.db.sqlalchemy import migration
+    from migrate.versioning import api as versioning_api
+    from glance.db import migration as db_migration
+    from glance.db.sqlalchemy import api as db_api
+elif glance_version.startswith('2014.1'):
+    from oslo.config.cfg import CONF
+    from glance.openstack.common.db.sqlalchemy import migration
+    from migrate.versioning import api as versioning_api
+else:
     from glance.db.sqlalchemy import migration
     from glance.common.exception import DatabaseMigrationError
     from migrate.versioning import api as versioning_api
-except ImportError:
-    try:
-        # Icehouse imports
-        from glance.openstack.common.db.sqlalchemy import migration
-        from glance.openstack.common.db import options
-        migration.CONF = options.CONF
-        from migrate.versioning import api as versioning_api
-
-        # Dummy class to make sure that the rest of the code can work whether
-        # we're using icehouse or not
-        class DatabaseMigrationError:
-            pass
-    except ImportError:
-        glance_found = False
-
-
-import os
-import subprocess
-
-import sqlalchemy
+    CONF = migration.CONF
 
 def is_under_version_control(conf):
     """ Return true if the database is under version control"""
-    migration.CONF(project='glance', default_config_files=[conf])
+    CONF(project='glance', default_config_files=[conf])
     try:
         migration.db_version()
     except DatabaseMigrationError:
@@ -75,16 +78,21 @@ def will_db_change(conf):
     # Load the config file options
     if not is_under_version_control(conf):
         return True
-    migration.CONF(project='glance', default_config_files=[conf])
-    try:
-        repo_path = migration.get_migrate_repo_path()
-        current_version = migration.db_version()
-    except AttributeError:
-        # icehouse
+    if glance_version.startswith('2014.2'):
+        engine = db_api.get_engine()
+        repo_path = db_migration.MIGRATE_REPO_PATH
+        current_version = migration.db_version(db_api.get_engine(),
+                                               repo_path,
+                                               db_migration.INIT_VERSION)
+    elif glance_version.startswith('2014.1'):
         repo_path = os.path.join(os.path.dirname(glance.__file__),
                                  'db', 'sqlalchemy', 'migrate_repo')
-        engine = sqlalchemy.create_engine(migration.CONF.database.connection)
+        engine = sqlalchemy.create_engine(CONF.database.connection)
         current_version = migration.db_version(engine, repo_path, 0)
+    else:
+        repo_path = migration.get_migrate_repo_path()
+        current_version = migration.db_version()
+
     repo_version = versioning_api.repository.Repository(repo_path).latest
     return current_version != repo_version
 
@@ -119,8 +127,6 @@ def main():
         ),
         supports_check_mode=True
     )
-    if not glance_found:
-        module.fail_json(msg="glance package could not be found")
 
     action = module.params['action']
     if action not in ['dbsync', 'db_sync']:
