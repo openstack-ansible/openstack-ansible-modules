@@ -67,6 +67,11 @@ options:
         - Name of the network from which IP has to be assigned to VM. Please make sure the network is an external network
      required: true
      default: None
+   port_network_name:
+     description:
+        - Name of the network where the VM port lives. Useful when the VM has more than one port
+     required: false
+     default: None
    instance_name:
      description:
         - The name of the instance to which the IP address should be assigned
@@ -133,9 +138,19 @@ def _get_server_state(module, nova):
     return server_info, server
                                  
 def _get_port_info(neutron, module, instance_id):
-    kwargs = {
-            'device_id': instance_id,
-    }
+    if module.params['port_network_name'] is None:
+      kwargs = {
+              'device_id': instance_id
+      }
+    else:
+      network_id = _get_net_id(neutron, module.params['port_network_name'])
+      if not network_id:
+            module.fail_json(msg = "cannot find the network specified, please check")
+
+      kwargs = {
+              'device_id': instance_id,
+              'network_id': network_id
+      }
     try:
         ports = neutron.list_ports(**kwargs)
     except Exception as e:
@@ -167,9 +182,9 @@ def _create_floating_ip(neutron, module, port_id, net_id):
         module.fail_json(msg="There was an error in updating the floating ip address: %s" % e.message)
     module.exit_json(changed=True, result=result, public_ip=result['floatingip']['floating_ip_address'])
 
-def _get_net_id(neutron, module):
+def _get_net_id(neutron, network_name):
     kwargs = {
-        'name': module.params['network_name'],
+        'name': network_name,
     }
     try:
         networks = neutron.list_networks(**kwargs)
@@ -201,6 +216,7 @@ def main():
             region_name = dict(default=None),
             network_name = dict(required=True),
             instance_name = dict(required=True),
+            port_network_name = dict(default=None),
             state = dict(default='present', choices=['absent', 'present'])
         ),
     )
@@ -225,7 +241,7 @@ def main():
     if module.params['state'] == 'present':
         if floating_ip:
             module.exit_json(changed = False, public_ip=floating_ip)
-        net_id = _get_net_id(neutron, module)
+        net_id = _get_net_id(neutron, module.params['network_name'])
         if not net_id:
             module.fail_json(msg = "cannot find the network specified, please check")
         _create_floating_ip(neutron, module, port_id, net_id)
