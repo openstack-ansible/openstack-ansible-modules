@@ -85,14 +85,16 @@ else:
 import traceback
 
 
-def authenticate(endpoint, token, login_user, login_password, insecure):
+def authenticate(endpoint, token, login_user, login_password, tenant_name,
+                 insecure):
     """Return a keystone client object"""
 
     if token:
         return client.Client(endpoint=endpoint, token=token, insecure=insecure)
     else:
-        return client.Client(endpoint=endpoint, username=login_user,
-                             password=login_password, insecure=insecure)
+        return client.Client(auth_url=endpoint, username=login_user,
+                             password=login_password, tenant_name=tenant_name,
+                             insecure=insecure)
 
 def get_service(keystone, name):
     """ Retrieve a service by name """
@@ -248,22 +250,26 @@ def main():
             region=dict(required=True),
             state=dict(default='present', choices=['present', 'absent']),
             endpoint=dict(required=False,
-                          default="http://127.0.0.1:35357/v2.0"),
+                          default="http://127.0.0.1:35357/v2.0",
+                          aliases=['auth_url']),
             token=dict(required=False),
             insecure=dict(required=False, default=False, choices=BOOLEANS),
 
             login_user=dict(required=False),
-            login_password=dict(required=False)
+            login_password=dict(required=False),
+            tenant_name=dict(required=False, aliases=['tenant'])
         ),
         supports_check_mode=True,
         mutually_exclusive=[['token', 'login_user'],
-                            ['token', 'login_password']]
+                            ['token', 'login_password'],
+                            ['token', 'tenant_name']]
     )
 
     endpoint = module.params['endpoint']
     token = module.params['token']
     login_user = module.params['login_user']
     login_password = module.params['login_password']
+    tenant_name = module.params['tenant_name']
     insecure = module.boolean(module.params['insecure'])
     name = module.params['name']
     service_type = module.params['type']
@@ -278,7 +284,8 @@ def main():
     region = module.params['region']
     state = module.params['state']
 
-    keystone = authenticate(endpoint, token, login_user, login_password, insecure)
+    keystone = authenticate(endpoint, token, login_user, login_password,
+                            tenant_name, insecure)
     check_mode = module.check_mode
 
     try:
