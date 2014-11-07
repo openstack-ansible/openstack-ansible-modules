@@ -171,6 +171,22 @@ def _get_floating_ip(module, neutron, fixed_ip_address):
         return None, None
     return ips['floatingips'][0]['id'], ips['floatingips'][0]['floating_ip_address']
 
+def _assign_floating_ip(neutron, module, port_id, net_id):
+    kwargs = {
+            'floating_network_id': net_id
+    }
+    try:
+        ips = neutron.list_floatingips(**kwargs)
+    except Exception as e:
+        module.fail_json(msg = "error in fetching the floatingips's %s" % e.message)
+
+    fip = next((fip for fip in ips['floatingips'] if fip['port_id'] is None), None)
+
+    if fip is None:
+        _create_floating_ip(neutron, module, port_id, net_id)
+    else:
+        _update_floating_ip(neutron, module, port_id, fip['id'])
+
 def _create_floating_ip(neutron, module, port_id, net_id):
     kwargs = {
             'port_id': port_id,
@@ -202,7 +218,7 @@ def _update_floating_ip(neutron, module, port_id, floating_ip_id):
         result = neutron.update_floatingip(floating_ip_id, {'floatingip': kwargs})
     except Exception as e:
         module.fail_json(msg="There was an error in updating the floating ip address: %s" % e.message)
-    module.exit_json(changed=True, result=result)
+    module.exit_json(changed=True, result=result, public_ip=result['floatingip']['floating_ip_address'])
 
 
 def main():
@@ -244,7 +260,7 @@ def main():
         net_id = _get_net_id(neutron, module.params['network_name'])
         if not net_id:
             module.fail_json(msg = "cannot find the network specified, please check")
-        _create_floating_ip(neutron, module, port_id, net_id)
+        _assign_floating_ip(neutron, module, port_id, net_id)
 
     if module.params['state'] == 'absent':
         if floating_ip:
