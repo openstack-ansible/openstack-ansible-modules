@@ -4,7 +4,7 @@ These are additional, unofficial Ansible modules for managing OpenStack.
 
 These are a dependency of the [openstack-ansible][1] repo for doing a test deployment of OpenStack into virtual machines managed by vagrant.
 
-To use this, add this directory to to the ANSIBLE_LIBRARY environment variable, or symlink this diretory to ./library relative to the playbook that uses it.
+To use this, add this directory to to the ANSIBLE_LIBRARY environment variable, or symlink this directory to ./library relative to the playbook that uses it.
 
 [1]: http://github.com/lorin/openstack-ansible
 
