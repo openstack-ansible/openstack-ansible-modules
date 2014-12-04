@@ -240,6 +240,7 @@ def _create_sg_rules(network_client, sg, rules):
     """
     if rules:
         for rule in rules:
+            rule['tenant_id'] = sg['tenant_id']
             rule['security_group_id'] = sg['id']
             data = {
                 "security_group_rule": rule
