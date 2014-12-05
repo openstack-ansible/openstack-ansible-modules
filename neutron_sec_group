@@ -143,8 +143,11 @@ def main():
         if module.params['state'] == "present":
             # UPDATE
             if sec_group_exists:
-                sg = _update_sg(module, network_client, sec_group)
-                module.exit_json(sec_group=sg, updated=True, changed=True)
+                changed, sg = _update_sg(module, network_client, sec_group)
+                if changed:
+                    module.exit_json(sec_group=sg, updated=True, changed=changed)
+                else:
+                    module.exit_json(sec_group=sg, changed=changed)
             # CREATE
             else:
                 sg = _create_sg(module, network_client, identity_client)
@@ -207,8 +210,13 @@ def _update_sg(module, network_client, sg):
     :param sg: security group that needs to be updated.
     :return: the updated security group.
     """
+    changed = False
+    sg = network_client.show_security_group(sg['id'])
+    sg = sg['security_group']
+
     # We only allow description updating, no name updating
-    if module.params["description"]:
+    if module.params["description"] and \
+        not module.params['description'] == sg['description']:
         body = {
             "security_group": {
                 "description": module.params["description"]
@@ -216,19 +224,52 @@ def _update_sg(module, network_client, sg):
         }
         sg = network_client.update_security_group(sg['id'], body)
         sg = sg['security_group']
+        changed = True
 
     # Security rules group update
-    # We keep things simple: first remove all rules, then insert the new
-    # rules. Not terribly efficient, but easy to implement.
     existing_rules = sg['security_group_rules']
+    wanted_rules = module.params['rules']
 
+    #check ok
+    ok_rules = []
+    for new_rule in wanted_rules:
+        # Ugly: define tenant also here so that matches
+        new_rule['tenant_id'] = sg['tenant_id']
+        # protocol is in lowercase
+        if 'protocol' in new_rule:
+            new_rule['protocol'] = new_rule['protocol'].lower()
+
+        matched_id = None
+        for old_rule in existing_rules:
+            clean_new_rule = new_rule.copy()
+            clean_old_rule = old_rule.copy()
+            old_id = clean_old_rule.pop('id')
+            clean_old_rule.pop('security_group_id')
+            for key in clean_old_rule.keys():
+                if key not in clean_new_rule:
+                    clean_new_rule[key] = None
+            if cmp(clean_old_rule, clean_new_rule) == 0:
+                matched_id = old_id
+                break
+
+        if matched_id:
+            new_rule['done'] = True
+            ok_rules.append(matched_id)
+
+    #apply new first
+    new_rules = [rule for rule in wanted_rules if 'done' not in rule]
+    if len(new_rules):
+        sg = _create_sg_rules(network_client, sg, new_rules)
+        changed = True
+
+    #then delete not ok
     for rule in existing_rules:
+        if rule['id'] in ok_rules:
+            continue
         network_client.delete_security_group_rule(rule['id'])
+        changed = True
 
-    sg = _create_sg_rules(network_client, sg, module.params['rules'])
-
-    return sg
-
+    return changed, sg
 
 def _create_sg_rules(network_client, sg, rules):
     """
