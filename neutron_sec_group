@@ -248,6 +248,10 @@ def _update_sg(module, network_client, sg):
             for key in clean_old_rule.keys():
                 if key not in clean_new_rule:
                     clean_new_rule[key] = None
+                    continue
+                value = clean_new_rule[key]
+                if isinstance(value, (str, unicode)) and value.isdigit():
+                    clean_new_rule[key] = int(value)
             if cmp(clean_old_rule, clean_new_rule) == 0:
                 matched_id = old_id
                 break
