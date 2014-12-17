@@ -198,7 +198,7 @@ def _create_sg(module, network_client, identity_client):
     sg = network_client.create_security_group(data)
     sg = sg["security_group"]
 
-    sg = _create_sg_rules(network_client, sg, rules)
+    changed, sg = _update_sg(module, network_client, sg)
     return sg
 
 
