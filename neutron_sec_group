@@ -118,7 +118,8 @@ def main():
             rules=dict(default=None),
             tenant_name=dict(required=False),
             state=dict(default="present", choices=['present', 'absent'])
-        )
+        ),
+        supports_check_mode=True
     )
     network_client = _get_network_client(module.params)
     identity_client = _get_identity_client(module.params)
@@ -171,6 +172,8 @@ def _delete_sg(module, network_client, sec_group):
     :param network_client: network client to use.
     :param sec_group: security group to delete.
     """
+    if module.check_mode:
+        return
     network_client.delete_security_group(sec_group['id'])
 
 
@@ -183,6 +186,8 @@ def _create_sg(module, network_client, identity_client):
     operation for a different tenant.
     :return: newly created security group.
     """
+    if module.check_mode:
+        return None
     # NOTE: we don't do explicit rule validation, the API server will take
     # care of that for us :-)
     rules = module.params['rules']
@@ -198,7 +203,7 @@ def _create_sg(module, network_client, identity_client):
     sg = network_client.create_security_group(data)
     sg = sg["security_group"]
 
-    sg = _create_sg_rules(network_client, sg, rules)
+    changed, sg = _update_sg(module, network_client, sg)
     return sg
 
 
@@ -208,15 +213,21 @@ def _update_sg(module, network_client, sg):
     :param module: module to get updated security group param from.
     :param network_client: network client to use.
     :param sg: security group that needs to be updated.
-    :return: the updated security group.
+    :return: True/False, the updated security group.
     """
     changed = False
     sg = network_client.show_security_group(sg['id'])
     sg = sg['security_group']
 
     # We only allow description updating, no name updating
-    if module.params["description"] and \
-        not module.params['description'] == sg['description']:
+    if module.params["description"] \
+        and not module.params['description'] == sg['description'] \
+        and module.check_mode:
+
+        changed = True
+    elif module.params["description"] \
+        and not module.params['description'] == sg['description'] \
+        and not module.check_mode:
         body = {
             "security_group": {
                 "description": module.params["description"]
@@ -263,14 +274,16 @@ def _update_sg(module, network_client, sg):
     #apply new first
     new_rules = [rule for rule in wanted_rules if 'done' not in rule]
     if len(new_rules):
-        sg = _create_sg_rules(network_client, sg, new_rules)
+        if not module.check_mode:
+            sg = _create_sg_rules(network_client, sg, new_rules)
         changed = True
 
     #then delete not ok
     for rule in existing_rules:
         if rule['id'] in ok_rules:
             continue
-        network_client.delete_security_group_rule(rule['id'])
+        if not module.check_mode:
+            sg = network_client.delete_security_group_rule(rule['id'])
         changed = True
 
     return changed, sg
