@@ -42,7 +42,7 @@ from glance.openstack.common import gettextutils
 gettextutils.install('glance')
 import glance.db.sqlalchemy.api
 
-glance_version = version_info.version
+glance_version = version_info.version_string()
 
 if glance_version.startswith('2014.2'):
     from oslo.config.cfg import CONF
