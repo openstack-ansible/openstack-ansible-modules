@@ -313,19 +313,20 @@ def _create_sg_rules(network_client, sg, rules):
 def _get_tenant_id(module, identity_client):
     """
     Returns the tenant_id, given tenant_name.
-    if tenant_name is not specified in the module params uses login_tenant_name
+    if tenant_name is not specified in the module params uses tenant_id
+    from Keystone session
     :param identity_client: identity_client used to get the tenant_id from its
            name.
     :param module_params: module parameters.
     """
     if not module.params['tenant_name']:
-        tenant_name = module.params['login_tenant_name']
+        tenant_id = identity_client.tenant_id
     else:
         tenant_name = module.params['tenant_name']
+        tenant = _get_tenant(identity_client, tenant_name)
+        tenant_id = tenant.id
 
-    tenant = _get_tenant(identity_client, tenant_name)
-
-    return tenant.id
+    return tenant_id
 
 
 def _get_tenant(identity_client, tenant_name):
