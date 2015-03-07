@@ -237,9 +237,21 @@ def _update_sg(module, network_client, sg):
         sg = sg['security_group']
         changed = True
 
-    # Security rules group update
+    if module.params['rules'] is not None:
+        rules_changed = _update_sg_rules(module, network_client, sg,
+                                         module.params['rules'])
+        changed |= rules_changed
+
+    return changed, sg
+
+
+def _update_sg_rules(module, network_client, sg, wanted_rules):
+    """
+    Updates rules of a security group.
+    """
+
+    changed = False
     existing_rules = sg['security_group_rules']
-    wanted_rules = module.params['rules']
 
     #check ok
     ok_rules = []
@@ -286,7 +298,8 @@ def _update_sg(module, network_client, sg):
             sg = network_client.delete_security_group_rule(rule['id'])
         changed = True
 
-    return changed, sg
+    return changed
+
 
 def _create_sg_rules(network_client, sg, rules):
     """
