@@ -149,7 +149,7 @@ def main():
 
         sec_groups = network_client.list_security_groups(**params)['security_groups']
         if len(sec_groups) > 1:
-            raise exceptions.NeutronClientNoUniqueMatch(resource='security_group', name=name)
+            raise exceptions.NeutronClientNoUniqueMatch(resource='security_group', name=params['name'])
         elif len(sec_groups) == 0:
             sec_group_exists = False
         else:
@@ -253,13 +253,13 @@ def _update_sg(module, network_client, sg, tenant_id):
 
     if module.params['rules'] is not None:
         rules_changed = _update_sg_rules(module, network_client, sg,
-                                         module.params['rules'])
+                                         module.params['rules'], tenant_id)
         changed |= rules_changed
 
     return changed, sg
 
 
-def _update_sg_rules(module, network_client, sg, wanted_rules):
+def _update_sg_rules(module, network_client, sg, wanted_rules, tenant_id):
     """
     Updates rules of a security group.
     """
