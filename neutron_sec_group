@@ -25,18 +25,27 @@ options:
    login_username:
      description:
         - login username to authenticate to keystone
+        - If unspecified, the OS_USERNAME environment variable is used
      required: true
    login_password:
      description:
         - Password of login user
+        - If unspecified, the OS_PASSWORD environment variable is used
      required: true
    login_tenant_name:
      description:
         - The tenant name of the login user
-     required: true
+        - If unspecified, the OS_TENANT_NAME environment variable is used
+     required: false
+   login_tenant_id:
+     description:
+        - The tenant id of the login user
+        - If unspecified, the OS_TENANT_ID environment variable is used
+     required: false
    auth_url:
      description:
         - The keystone url for authentication
+        - If unspecified, the OS_AUTH_URL environment variable is used
      required: false
      default: 'http://127.0.0.1:5000/v2.0/'
    region_name:
@@ -121,10 +130,11 @@ def main():
     """
     module = AnsibleModule(
         argument_spec=dict(
-            auth_url=dict(default='http://127.0.0.1:5000/v2.0/'),
-            login_username=dict(required=True),
-            login_password=dict(required=True),
-            login_tenant_name=dict(required=True),
+            auth_url=dict(default=None, required=False),
+            login_username=dict(default=None, required=False),
+            login_password=dict(default=None, required=False),
+            login_tenant_name=dict(default=None, required=False),
+            login_tenant_id=dict(default=None, required=False),
             name=dict(required=True),
             description=dict(default=None),
             region_name=dict(default=None),
@@ -134,6 +144,19 @@ def main():
         ),
         supports_check_mode=True
     )
+    # Grab configuration from environment or params for openstack
+    for item in (
+            'auth_url',
+            'login_tenant_name',
+            'login_username',
+            'login_password',
+            'login_tenant_id'
+    ):
+        if not module.params[item]:
+            module.params[item] = os.environ.get(
+                'OS_{0}'.format(item.upper().replace('LOGIN_', ''))
+            )
+
     network_client = _get_network_client(module.params)
     identity_client = _get_identity_client(module.params)
 
@@ -367,18 +390,19 @@ def _get_tenant_id(module, identity_client):
     """
     Returns the tenant_id, given tenant_name.
     if tenant_name is not specified in the module params uses login_tenant_name
+    if tenant_name is not specified and login_tenant_id is defined, it uses that.
     :param identity_client: identity_client used to get the tenant_id from its
            name.
     :param module_params: module parameters.
     """
     if not module.params['tenant_name']:
-        tenant_name = module.params['login_tenant_name']
+        if module.params['login_tenant_id']:
+            return module.params['login_tenant_id']
+
+        # Use token to get ID to avoid using "admin"/internal call
+        return identity_client.tenant_id
     else:
-        tenant_name = module.params['tenant_name']
-
-    tenant = _get_tenant(identity_client, tenant_name)
-
-    return tenant.id
+        return _get_tenant(identity_client, module.params['tenant_name']).id
 
 
 def _get_tenant(identity_client, tenant_name):
