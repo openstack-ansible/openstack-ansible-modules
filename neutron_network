@@ -130,7 +130,7 @@ def _get_ksclient(module, kwargs):
     global _os_keystone
     _os_keystone = kclient
     return kclient
- 
+
 
 def _get_endpoint(module, ksclient):
     try:
@@ -155,15 +155,18 @@ def _get_neutron_client(module, kwargs):
 
 def _set_tenant_id(module):
     global _os_tenant_id
-    if not module.params['tenant_name']:
-        tenant_name = module.params['login_tenant_name']
-    else:
+    if module.params['tenant_name']:
+        # We need admin power in order retrieve the tenant_id of a given
+        # tenant name and to create/delete networks for a tenant that is not
+        # the one used to authenticate the user.
         tenant_name = module.params['tenant_name']
-        
-    for tenant in _os_keystone.tenants.list():
-        if tenant.name == tenant_name:
-            _os_tenant_id = tenant.id
-            break
+        for tenant in _os_keystone.tenants.list():
+            if tenant.name == tenant_name:
+                _os_tenant_id = tenant.id
+                break
+    else:
+        _os_tenant_id = _os_keystone.tenant_id
+
     if not _os_tenant_id:
         module.fail_json(msg = "The tenant id cannot be found, please check the paramters")
 
@@ -219,7 +222,7 @@ def _create_network(module, neutron):
     except Exception as e:
         module.fail_json(msg = "Error in creating network: %s" % e.message)
     return net['network']['id']
-                
+
 def _delete_network(module, net_id, neutron):
 
     try:
@@ -229,7 +232,7 @@ def _delete_network(module, net_id, neutron):
     return True
 
 def main():
-    
+
     module = AnsibleModule(
         argument_spec = dict(
             login_username = dict(default='admin'),
