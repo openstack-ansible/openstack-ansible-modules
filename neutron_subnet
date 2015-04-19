@@ -85,6 +85,11 @@ options:
         - Whether DHCP should be enabled for this subnet.
      required: false
      default: true
+   no_gateway:
+     description:
+        - If "true", no gateway will be created for this subnet
+     required: false
+     default: false
    gateway_ip:
      description:
         - The ip that would be assigned to the gateway for this subnet
@@ -226,8 +231,12 @@ def _create_subnet(module, neutron):
             }
         ]
         subnet.update({'allocation_pools': allocation_pools})
-    if not module.params['gateway_ip']:
-        subnet.pop('gateway_ip')
+    # "subnet['gateway_ip'] = None" means: "no gateway"
+    # no gateway_ip in body means: "automatic gateway"
+    if module.params['no_gateway']:
+        subnet['gateway_ip'] = None
+    elif module.params['gateway_ip'] is not None:
+        subnet['gateway_ip'] = module.params['gateway_ip']
     if module.params['dns_nameservers']:
         subnet['dns_nameservers'] = module.params['dns_nameservers'].split(',')
     else:
@@ -265,6 +274,7 @@ def main():
             state = dict(default='present', choices=['absent', 'present']),
             ip_version = dict(default='4', choices=['4', '6']),
             enable_dhcp = dict(default='true', choices=BOOLEANS),
+            no_gateway = dict(default='false', choices=BOOLEANS),
             gateway_ip = dict(default=None),
             dns_nameservers = dict(default=None),
             allocation_pool_start = dict(default=None),
