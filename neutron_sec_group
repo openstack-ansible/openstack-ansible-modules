@@ -310,7 +310,8 @@ def _update_sg_rules(module, network_client, sg, wanted_rules, tenant_id):
                     clean_new_rule[key] = None
                     continue
                 value = clean_new_rule[key]
-                if isinstance(value, (str, unicode)) and value.isdigit():
+                if isinstance(value, (str, unicode)) and value.isdigit() and \
+                    key != 'tenant_id':
                     clean_new_rule[key] = int(value)
             if cmp(clean_old_rule, clean_new_rule) == 0:
                 matched_id = old_id
