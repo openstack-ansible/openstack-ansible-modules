@@ -196,10 +196,14 @@ def _create_network(module, neutron):
         'provider:network_type': module.params.get('provider_network_type'),
         'provider:physical_network': module.params.get('provider_physical_network'),
         'provider:segmentation_id': module.params.get('provider_segmentation_id'),
-        'router:external': module.params.get('router_external'),
         'shared': module.params.get('shared'),
         'admin_state_up': module.params.get('admin_state_up'),
     }
+
+    # Older neutron versions wil reject explicitly router:external set
+    # to false
+    if module.params.get('router_external'):
+        network['router:external'] = True
 
     if module.params['provider_network_type'] == 'local':
         network.pop('provider:physical_network', None)
