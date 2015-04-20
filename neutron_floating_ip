@@ -241,7 +241,8 @@ def main():
 
     try:
         nova = nova_client.Client(module.params['login_username'], module.params['login_password'],
-            module.params['login_tenant_name'], module.params['auth_url'], service_type='compute')
+            module.params['login_tenant_name'], module.params['auth_url'], service_type='compute',
+            region_name=module.params.get('region_name'))
         neutron = _get_neutron_client(module, module.params)
     except Exception as e:
         module.fail_json(msg="Error in authenticating to nova: %s" % e.message)
