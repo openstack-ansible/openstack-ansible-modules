@@ -92,16 +92,18 @@ _os_tenant_id = None
 
 def _get_ksclient(module, kwargs):
     try:
-        kclient = ksclient.Client(username=kwargs.get('login_username'),
-                                 password=kwargs.get('login_password'),
-                                 tenant_name=kwargs.get('login_tenant_name'),
-                                 auth_url=kwargs.get('auth_url'))
+        kclient = ksclient.Client(
+            username=module.params.get('login_username'),
+            password=module.params.get('login_password'),
+            tenant_name=module.params.get('login_tenant_name'),
+            auth_url=module.params.get('auth_url'),
+            region_name=module.params.get('region_name'))
     except Exception as e:
         module.fail_json(msg = "Error authenticating to the keystone: %s " % e.message)
     global _os_keystone
     _os_keystone = kclient
     return kclient
- 
+
 
 def _get_endpoint(module, ksclient):
     try:
@@ -172,7 +174,7 @@ def _delete_router(module, neutron, router_id):
     except:
         module.fail_json("Error in deleting the router")
     return True
-                
+
 def main():
     module = AnsibleModule(
         argument_spec = dict(
@@ -187,7 +189,7 @@ def main():
         admin_state_up = dict(type='bool', default=True),
         ),
     )
-                
+
     neutron = _get_neutron_client(module, module.params)
     _set_tenant_id(module)
 
@@ -206,7 +208,7 @@ def main():
         else:
             _delete_router(module, neutron, router_id)
             module.exit_json(changed=True, result="deleted")
-                
+
 # this is magic, see lib/ansible/module.params['common.py
 from ansible.module_utils.basic import *
 main()
