@@ -69,6 +69,11 @@ options:
         - Name of the external network which should be attached to the router.
      required: true
      default: None
+   enable_snat:
+     description:
+        - Enable SNAT on traffic using this gateway (may require admin role).
+     required: false
+     default: true
 requirements: ["neutronclient", "keystoneclient"]
 '''
 
@@ -143,8 +148,10 @@ def _get_net_id(neutron, module):
 
 def _add_gateway_router(neutron, module, router_id, network_id):
     kwargs = {
-        'network_id': network_id
+        'network_id': network_id,
+        'enable_snat': module.params['enable_snat']
     }
+
     try:
         neutron.add_gateway_router(router_id, kwargs)
     except Exception as e:
@@ -169,6 +176,7 @@ def main():
             region_name = dict(default=None),
             router_name = dict(required=True),
             network_name = dict(required=True),
+            enable_snat = dict(default=True, type='bool'),
             state = dict(default='present', choices=['absent', 'present']),
         ),
     )
@@ -188,8 +196,13 @@ def main():
             _add_gateway_router(neutron, module, router['id'], network_id)
             module.exit_json(changed=True, updated=False, result="created")
         else:
-            if router['external_gateway_info']['network_id'] == network_id:
+            if router['external_gateway_info']['network_id'] == network_id \
+                    and router['external_gateway_info']['enable_snat'] == \
+                    module.params['enable_snat']:
                 module.exit_json(changed=False, updated=False, result="success")
+            elif router['external_gateway_info']['network_id'] == network_id:
+                _add_gateway_router(neutron, module, router['id'], network_id)
+                module.exit_json(changed=True, updated=True, result="updated")
             else:
                 _remove_gateway_router(neutron, module, router['id'])
                 _add_gateway_router(neutron, module, router['id'], network_id)
