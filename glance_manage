@@ -24,6 +24,7 @@ EXAMPLES = '''
 glance_manage: action=dbsync
 '''
 
+from distutils.version import LooseVersion
 import os
 import subprocess
 import sys
@@ -36,10 +37,15 @@ except ImportError:
     sys.exit(1)
 
 from glance.version import version_info
-# this is necessary starting from havana release due to bug 885529
+# this is necessary between the havana and juno releases due to bug 885529
 # https://bugs.launchpad.net/glance/+bug/885529
-from glance.openstack.common import gettextutils
-gettextutils.install('glance')
+try:
+  from glance.openstack.common import gettextutils
+  gettextutils.install('glance')
+except ImportError:
+    # gettextutils has been removed in version 2015.1, ignoring the error
+    pass
+
 import glance.db.sqlalchemy.api
 
 try:
@@ -47,7 +53,7 @@ try:
 except AttributeError:
     glance_version = version_info.version
 
-if glance_version.startswith('2014.2'):
+if LooseVersion(glance_version) >= LooseVersion('2014.2'):
     from oslo.config.cfg import CONF
     from oslo.db.sqlalchemy import migration
     from migrate.versioning import api as versioning_api
@@ -81,7 +87,7 @@ def will_db_change(conf):
     # Load the config file options
     if not is_under_version_control(conf):
         return True
-    if glance_version.startswith('2014.2'):
+    if LooseVersion(glance_version) >= LooseVersion('2014.2'):
         engine = db_api.get_engine()
         repo_path = db_migration.MIGRATE_REPO_PATH
         current_version = migration.db_version(db_api.get_engine(),
