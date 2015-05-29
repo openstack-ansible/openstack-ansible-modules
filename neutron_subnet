@@ -110,6 +110,16 @@ options:
         - From the subnet pool the last IP that should be assigned to the virtual machines
      required: false
      default: None
+   ipv6-ra-mode:
+     description:
+        - IPv6 router advertisement mode: dhcpv6-stateful,dhcpv6-stateless,slaac
+     required: false
+     default: none
+   ipv6-address-mode:
+     description:
+        - IPv6 address mode: dhcpv6-stateful,dhcpv6-stateless,slaac
+     required: false
+     default: none
    host_routes:
      description:
         - Host routes for this subnet, list of dictionaries, e.g. [{destination: 0.0.0.0/0, nexthop: 123.456.78.9}, {destination: 192.168.0.0/24, nexthop: 192.168.0.1}]
@@ -248,6 +258,10 @@ def _create_subnet(module, neutron):
         subnet.pop('dns_nameservers')
     if not module.params['host_routes']:
         subnet.pop('host_routes')
+    if module.params['ipv6_ra_mode'] and int(module.params['ip_version']) == 6:
+        subnet.update({'ipv6_ra_mode': module.params['ipv6_ra_mode']})
+    if module.params['ipv6_address_mode'] and int(module.params['ip_version']) == 6:
+        subnet.update({'ipv6_address_mode': module.params['ipv6_address_mode']})
     try:
         new_subnet = neutron.create_subnet(dict(subnet=subnet))
     except Exception, e:
@@ -265,6 +279,7 @@ def _delete_subnet(module, neutron, subnet_id):
 
 def main():
 
+    ipv6_mode_choices = ['dhcpv6-stateful', 'dhcpv6-stateless', 'slaac']
     module = AnsibleModule(
         argument_spec = dict(
             login_username = dict(default='admin'),
@@ -284,6 +299,8 @@ def main():
             dns_nameservers = dict(default=None),
             allocation_pool_start = dict(default=None),
             allocation_pool_end = dict(default=None),
+            ipv6_ra_mode = dict(default=None, choices=ipv6_mode_choices),
+            ipv6_address_mode = dict(default=None, choices=ipv6_mode_choices),
             host_routes = dict(default=None),
         ),
     )
