@@ -77,6 +77,11 @@ options:
         - The name of the instance to which the IP address should be assigned
      required: true
      default: None
+   fixed_ip:
+     description:
+        - IP address on the instance's port. Useful when the port has more than one IP
+     required: false
+     default: None
 requirements: ["novaclient", "neutronclient", "keystoneclient"]
 '''
 
@@ -194,6 +199,8 @@ def _create_floating_ip(neutron, module, port_id, net_id):
             'port_id': port_id,
             'floating_network_id': net_id
     }
+    if 'fixed_ip' in module.params:
+        kwargs['fixed_ip_address'] = module.params['fixed_ip']
     try:
         result = neutron.create_floatingip({'floatingip': kwargs})
     except Exception as e:
@@ -235,6 +242,7 @@ def main():
             network_name = dict(required=True),
             instance_name = dict(required=True),
             port_network_name = dict(default=None),
+            fixed_ip = dict(default=None),
             state = dict(default='present', choices=['absent', 'present'])
         ),
     )
