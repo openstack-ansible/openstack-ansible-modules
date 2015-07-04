@@ -122,112 +122,116 @@ def get_endpoint(keystone, name):
         return endpoints[0]
 
 
-def ensure_service_present(keystone, name, service_type, description,
-                           check_mode):
-    """ Ensure the service is present and has the right values
+def ensure_present(keystone, name, service_type, description, public_url,
+                   internal_url, admin_url, region, check_mode):
+    """ Ensure the service and its endpoint are present and have the right values.
 
-        Returns a pair, where the first element is a boolean that indicates
-        a state change, and the second element is the service uuid, or None
-        if running in check mode"""
+        Returns a tuple, where the first element is a boolean that indicates
+        a state change, the second element is the service uuid (or None in
+        check mode), and the third element is the endpoint uuid (or None in
+        check mode)."""
+    # Fetch service and endpoint, if they exist.
     service = None
-    try:
-        service = get_service(keystone, name)
-    except:
-        # Service doesn't exist yet, we'll need to create one
-        pass
-    else:
-        # See if it matches exactly
-        if service.name == name and \
-           service.type == service_type and \
-           service.description == description:
-
-            # Same, no changes needed
-            return (False, service.id)
-
-    # At this point, we know we will need to make a change
-    if check_mode:
-        return (True, None)
-
-    if service is None:
-        service = keystone.services.create(name=name,
-                                           service_type=service_type,
-                                           description=description)
-        return (True, service.id)
-    else:
-        msg = "keystone v2 API doesn't support updating services"
-        raise ValueError(msg)
-
-
-def ensure_endpoint_present(keystone, name, public_url, internal_url,
-                             admin_url, region, check_mode):
-    """ Ensure the service endpoint is present and have the right values
-
-        Assumes the service object has already been created at this point"""
-
-    service = get_service(keystone, name)
     endpoint = None
-    try:
-        endpoint = get_endpoint(keystone, name)
-    except:
-        # Endpoint doesn't exist yet, we'll need to create one
-        pass
-    else:
-        # See if it matches
-        if endpoint.publicurl == public_url and \
-           endpoint.adminurl == admin_url and \
-           endpoint.internalurl == internal_url and \
-           endpoint.region == region:
+    try: service = get_service(keystone, name)
+    except: pass
+    try: endpoint = get_endpoint(keystone, name)
+    except: pass
 
-            # Same, no changes needed
-            return (False, endpoint.id)
+    changed = False
 
-    # At this point, we know we will need to make a change
-    if check_mode:
-        return (True, None)
+    # Delete endpoint if it exists and doesn't match.
+    if endpoint is not None:
+        identical = endpoint.publicurl == public_url and \
+                    endpoint.adminurl == admin_url and \
+                    endpoint.internalurl == internal_url and \
+                    endpoint.region == region
+        if not identical:
+            changed = True
+            ensure_endpoint_absent(keystone, name, check_mode)
+            endpoint = None
 
+    # Delete service and its endpoint if the service exists and doesn't match.
+    if service is not None:
+        identical = service.name == name and \
+                    service.type == service_type and \
+                    service.description == description
+        if not identical:
+            changed = True
+            ensure_endpoint_absent(keystone, name, check_mode)
+            endpoint = None
+            ensure_service_absent(keystone, name, check_mode)
+            service = None
+
+    # Recreate service, if necessary.
+    if service is None:
+        if not check_mode:
+            service = keystone.services.create(
+                name=name,
+                service_type=service_type,
+                description=description,
+            )
+        changed = True
+
+    # Recreate endpoint, if necessary.
     if endpoint is None:
-        endpoint = keystone.endpoints.create(region=region,
-                                             service_id=service.id,
-                                             publicurl=public_url,
-                                             adminurl=admin_url,
-                                             internalurl=internal_url)
-        return (True, endpoint.id)
-    else:
-        msg = "keystone v2 API doesn't support updating endpoints"
-        raise ValueError(msg)
+        if not check_mode:
+            endpoint = keystone.endpoints.create(
+                region=region,
+                service_id=service.id,
+                publicurl=public_url,
+                adminurl=admin_url,
+                internalurl=internal_url,
+            )
+        changed = True
+
+    if check_mode:
+        # In check mode, the service/endpoint uuids will be the old uuids,
+        # so omit them.
+        return changed, None, None
+    return changed, service.id, endpoint.id
 
 
 def ensure_service_absent(keystone, name, check_mode):
     """ Ensure the service is absent"""
+    try:
+        service = get_service(keystone, name)
+        if not check_mode:
+            keystone.services.delete(service.id)
+        return True
+    except KeyError:
+        # Service doesn't exist, so we're done.
+        return False
 
-    raise NotImplementedError()
 
 def ensure_endpoint_absent(keystone, name, check_mode):
     """ Ensure the service endpoint """
-    raise NotImplementedError()
+    try:
+        endpoint = get_endpoint(keystone, name)
+        if not check_mode:
+            keystone.endpoints.delete(endpoint.id)
+        return True
+    except KeyError:
+        # Endpoint doesn't exist, so we're done.
+        return False
 
 
 def dispatch(keystone, name, service_type, description, public_url,
              internal_url, admin_url, region, state, check_mode):
 
     if state == 'present':
-        (service_changed, service_id) = ensure_service_present(keystone,
-                                                              name,
-                                                              service_type,
-                                                              description,
-                                                              check_mode)
-
-        (endpoint_changed, endpoint_id) = ensure_endpoint_present(
+        (changed, service_id, endpoint_id) = ensure_present(
             keystone,
             name,
+            service_type,
+            description,
             public_url,
             internal_url,
             admin_url,
             region,
-            check_mode)
-        return dict(changed=service_changed or endpoint_changed,
-                    service_id=service_id,
-                    endpoint_id=endpoint_id)
+            check_mode,
+        )
+        return dict(changed=changed, service_id=service_id, endpoint_id=endpoint_id)
     elif state == 'absent':
         endpoint_changed = ensure_endpoint_absent(keystone, name, check_mode)
         service_changed = ensure_service_absent(keystone, name, check_mode)
