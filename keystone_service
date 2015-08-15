@@ -44,7 +44,7 @@ options:
   region:
     description:
         - region of service
-    required: yes
+    required: no
   state:
      description:
         - Indicate desired state of the resource
@@ -251,7 +251,7 @@ def main():
             public_url=dict(required=True, aliases=['url', 'publicurl']),
             internal_url=dict(required=False, aliases=['internalurl']),
             admin_url=dict(required=False, aliases=['adminurl']),
-            region=dict(required=True),
+            region=dict(required=False, default='RegionOne'),
             state=dict(default='present', choices=['present', 'absent']),
             endpoint=dict(required=False,
                           default="http://127.0.0.1:35357/v2.0",
