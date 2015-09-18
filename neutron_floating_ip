@@ -178,6 +178,11 @@ def _get_floating_ip(module, neutron, fixed_ip_address):
         return None, None
     return ips['floatingips'][0]['id'], ips['floatingips'][0]['floating_ip_address']
 
+def _get_tenant_id(module):
+    tenants = _get_ksclient(module, {}).tenants.list()
+    tenant = next((t for t in tenants if t.name == module.params.get('login_tenant_name')), None)
+    return tenant.id
+
 def _assign_floating_ip(neutron, module, port_id, net_id):
     kwargs = {
             'floating_network_id': net_id
@@ -187,7 +192,8 @@ def _assign_floating_ip(neutron, module, port_id, net_id):
     except Exception as e:
         module.fail_json(msg = "error in fetching the floatingips's %s" % e.message)
 
-    fip = next((fip for fip in ips['floatingips'] if fip['port_id'] is None), None)
+    tenant_id = _get_tenant_id(module)
+    fip = next((fip for fip in ips['floatingips'] if fip['port_id'] is None and fip['tenant_id'] == tenant_id), None)
 
     if fip is None:
         _create_floating_ip(neutron, module, port_id, net_id)
