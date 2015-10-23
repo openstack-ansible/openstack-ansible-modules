@@ -1,6 +1,8 @@
 #!/usr/bin/python
 #coding: utf-8 -*-
 
+# https://github.com/openstack-ansible/openstack-ansible-modules/blob/master/nova_flavor
+
 # (c) 2014, Adam Samalik <asamalik@redhat.com>
 #
 # This module is free software: you can redistribute it and/or modify
@@ -25,9 +27,9 @@ except ImportError:
 DOCUMENTATION = '''
 ---
 module: nova_flavor
-short_description: Manage OpenStack flavours
+short_description: Manage OpenStack flavors
 description:
-    - Create VM flavours with OpenStack Nova service
+    - Create VM flavors with OpenStack Nova service
 requirements: [ python-novaclient ]
 options:
   login_username:
@@ -62,15 +64,19 @@ options:
   ram:
     description:
       - Memory in MB for the flavor
-    required: True
+    required: False
   vcpus:
     description:
       - Number of VCPUs for the flavor
-    required: True
-  disk:
+    required: False
+  root:
     description:
-      - Size of local disk in GB
-    required: True
+      - Size of root disk in GB
+    required: False
+  ephemeral:
+    description:
+      - Size of ephemeral space in GB
+    required: False
   swap:
     description:
       - Swap space in MB
@@ -83,7 +89,19 @@ options:
     default: ID will be automatically generated
   is_public:
     description:
-      - Decide if the flavour is public
+      - Decide if the flavor is public
+    choices: ['true', 'false']
+    default: 'true'
+  extra_specs:
+    description:
+      - Metadata used by scheduling to select correct host aggregate
+    default: None
+  state:
+    description:
+      - Create or delete flavor
+    required: False
+    choices: ['present', 'absent']
+    default: 'present'
 '''
 
 EXAMPLES = '''
@@ -94,9 +112,9 @@ EXAMPLES = '''
       name: medium
       ram: 2048
       vcpus: 2
-      disk: 20
+      root: 0
+      ephemeral: 20
 '''
-
 
 def authenticate(module, auth_url, username, password, tenant_name, region):
     """
@@ -131,19 +149,42 @@ def get_flavors(nova, name, id=None):
         flavors = [x for x in nova.flavors.list() if x.name == name and x.id == str(id)]
     return flavors
 
-def create_flavor(module, nova, name, ram, vcpus, disk, swap, id, is_public):
+def create_flavor(module, nova, name, ram, vcpus, root, ephemeral, swap, id, is_public, extra_specs):
     flavors = get_flavors(nova, name, id)
     if len(flavors) >0:
-        return False, flavors[0].id
+        present_flavor = flavors[0]
+        # When flavor is created with 0 swap, nova will use an empty value
+        if present_flavor.swap == "":
+            present_flavor.swap = 0
+        # flavor create expects lower case is_public values, but converts them into capitalized value
+        if present_flavor.ram == int(ram) and present_flavor.vcpus == int(vcpus) and present_flavor.disk == int(root) and present_flavor.ephemeral == int(ephemeral) and present_flavor.swap == int(swap) and str(present_flavor.is_public) == is_public.capitalize():
+            if present_flavor.get_keys() == extra_specs:
+                return False, flavors[0].id
+            else:
+                present_flavor.set_keys(extra_specs)
+                return True, flavors[0].id
+        else:
+            module.fail_json(msg = "Flavor {0} already present, but specs have changed!".format(name))
 
     try:
-        flavor = nova.flavors.create(name, ram, vcpus, disk, swap=swap,
-                                     flavorid=id, is_public=is_public)
+        flavor = nova.flavors.create(name=name, ram=ram, vcpus=vcpus, disk=root, ephemeral=ephemeral, flavorid=id, swap=swap, is_public=is_public)
+        flavor.set_keys(extra_specs)
     except Exception as e:
-        module.fail_json(msg = "Could not create a flavour: {}".format(
-            e.message))
+        module.fail_json(msg = "Could not create a flavor: {0}".format(e.message))
 
     return True, flavor.id
+
+def delete_flavor(module, nova, name):
+    flavors = get_flavors(nova, name)
+    if len(flavors) == 0:
+        return False
+    for flavor in flavors:
+        try:
+            nova.flavors.delete(flavor.id);
+        except Exception as e:
+            module.fail_json(msg = "Could not delete flavor {0}: {1}".format(name, e.message))
+
+    return True
 
 def main():
     module = AnsibleModule(
@@ -154,12 +195,15 @@ def main():
             auth_url = dict(default='http://127.0.0.1:35357/v2.0/'),
             region_name = dict(default=None),
             name = dict(required=True),
-            ram = dict(required=True),
-            vcpus = dict(required=True),
-            disk = dict(required=True),
+            ram = dict(required=False),
+            vcpus = dict(required=False),
+            root = dict(required=False),
+            ephemeral = dict(required=False),
+            extra_specs = dict(required=False,default=None),
             swap = dict(default=0),
             id = dict(default=None),
-            is_public = dict(default=True, choices=BOOLEANS),
+            is_public = dict(default='true'),
+            state = dict(default='present'),
         )
     )
     auth_url = module.params['auth_url']
@@ -170,17 +214,27 @@ def main():
     name = module.params['name']
     ram = module.params['ram']
     vcpus = module.params['vcpus']
-    disk = module.params['disk']
+    root = module.params['root']
+    ephemeral = module.params['ephemeral']
+    extra_specs = module.params['extra_specs']
     swap = module.params['swap']
     id = module.params['id']
+    state = module.params['state']
     is_public = module.params['is_public']
 
     nova = authenticate(module, auth_url, username, password, tenant_name, region)
 
-    changed, id = create_flavor(module, nova, name, ram, vcpus, disk, swap, id,
-                                is_public)
+    if state == 'present':
+        changed, id = create_flavor(module, nova, name, ram, vcpus, root, ephemeral, swap, id,
+                                is_public, extra_specs)
+        module.exit_json(changed=changed, name=name, id=id)
+    elif state == 'absent':
+        changed = delete_flavor(module, nova, name)
+        module.exit_json(changed=changed, name=name)
+    else:
+        raise ValueError("Code should never reach here")
 
-    module.exit_json(changed=changed, name=name, id=id)
+
 
 # this is magic, see lib/ansible/module_common.py
 #<<INCLUDE_ANSIBLE_MODULE_COMMON>>
