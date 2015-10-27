@@ -1,9 +1,7 @@
 #!/usr/bin/python
 #coding: utf-8 -*-
 
-# https://github.com/openstack-ansible/openstack-ansible-modules/blob/master/nova_flavor
-
-# (c) 2014, Adam Samalik <asamalik@redhat.com>
+# (c) 2015, Christian Zunker <christian.zunker@codecentric.de>
 #
 # This module is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,10 +24,10 @@ except ImportError:
 
 DOCUMENTATION = '''
 ---
-module: nova_flavor
-short_description: Manage OpenStack flavors
+module: nova_aggregate
+short_description: Manage OpenStack host aggregates
 description:
-    - Create VM flavors with OpenStack Nova service
+    - Create host aggregates with OpenStack Nova service
 requirements: [ python-novaclient ]
 options:
   login_username:
@@ -59,61 +57,34 @@ options:
     default: None
   name:
     description:
-      - Descriptive name of the flavor
+      - Descriptive name of the aggregate
     required: True
-  ram:
+  availability_zone:
     description:
-      - Memory in MB for the flavor
+      - Availability Zone of the aggregate
     required: False
-  vcpus:
+  hosts:
     description:
-      - Number of VCPUs for the flavor
+      - Hosts asigned to the aggregate
     required: False
-  root:
+  metadata:
     description:
-      - Size of root disk in GB
+      - Metadata for the aggregate, used as reference inside flavors
     required: False
-  ephemeral:
-    description:
-      - Size of ephemeral space in GB
-    required: False
-  swap:
-    description:
-      - Swap space in MB
-    required: False
-    default: 0
-  id:
-    description:
-      - ID for the flavor (optional).
-    required: False
-    default: ID will be automatically generated
-  is_public:
-    description:
-      - Decide if the flavor is public
-    choices: ['true', 'false']
-    default: 'true'
-  extra_specs:
-    description:
-      - Metadata used by scheduling to select correct host aggregate
-    default: None
   state:
     description:
-      - Create or delete flavor
+      - Create or delete aggregate
     required: False
     choices: ['present', 'absent']
     default: 'present'
 '''
 
 EXAMPLES = '''
-  - nova_flavor:
+  - nova_aggregate:
       login_username: admin
       login_password: 1234
       login_tenant_name: admin
       name: medium
-      ram: 2048
-      vcpus: 2
-      root: 0
-      ephemeral: 20
 '''
 
 def authenticate(module, auth_url, username, password, tenant_name, region):
@@ -142,47 +113,47 @@ def authenticate(module, auth_url, username, password, tenant_name, region):
 
     return nova
 
-def get_flavors(nova, name, id=None):
+def get_aggregates(nova, name, id=None):
     if not id:
-        flavors = [x for x in nova.flavors.list() if x.name == name]
+        aggregates = [x for x in nova.aggregates.list() if x.name == name]
     else:
-        flavors = [x for x in nova.flavors.list() if x.name == name and x.id == str(id)]
-    return flavors
+        aggregates = [x for x in nova.aggregates.list() if x.name == name and x.id == str(id)]
+    return aggregates
 
-def create_flavor(module, nova, name, ram, vcpus, root, ephemeral, swap, id, is_public, extra_specs):
-    flavors = get_flavors(nova, name, id)
-    if len(flavors) >0:
-        present_flavor = flavors[0]
-        # When flavor is created with 0 swap, nova will use an empty value
-        if present_flavor.swap == "":
-            present_flavor.swap = 0
-        # flavor create expects lower case is_public values, but converts them into capitalized value
-        if present_flavor.ram == int(ram) and present_flavor.vcpus == int(vcpus) and present_flavor.disk == int(root) and present_flavor.ephemeral == int(ephemeral) and present_flavor.swap == int(swap) and str(present_flavor.is_public) == is_public.capitalize():
-            if present_flavor.get_keys() == extra_specs:
-                return False, flavors[0].id
-            else:
-                present_flavor.set_keys(extra_specs)
-                return True, flavors[0].id
-        else:
-            module.fail_json(msg = "Flavor {0} already present, but specs have changed!".format(name))
+def create_aggregate(module, nova, name, availability_zone, hosts, metadata, id):
+    aggregate_name = name + "-" + availability_zone
+    aggregates = get_aggregates(nova, aggregate_name, id)
+    if len(aggregates) >0:
+        present_aggregate = aggregates[0]
+        changed = False
+        for host in hosts:
+            if not host in present_aggregate.hosts:
+                nova.aggregates.add_host(present_aggregate, host)
+                changed = True
+        if metadata != present_aggregate.metadata:
+            nova.aggregates.set_metadata(present_aggregate, metadata)
+            changed = True
+        return changed, aggregates[0].id
 
     try:
-        flavor = nova.flavors.create(name=name, ram=ram, vcpus=vcpus, disk=root, ephemeral=ephemeral, flavorid=id, swap=swap, is_public=is_public)
-        flavor.set_keys(extra_specs)
+        aggregate = nova.aggregates.create(name=aggregate_name, availability_zone=availability_zone)
+        for host in hosts:
+            nova.aggregates.add_host(aggregate, host)
+        nova.aggregates.set_metadata(aggregate, metadata)
     except Exception as e:
-        module.fail_json(msg = "Could not create a flavor: {0}".format(e.message))
+        module.fail_json(msg = "Could not create aggregate: {0}".format(e.message))
 
-    return True, flavor.id
+    return True, aggregate.id
 
-def delete_flavor(module, nova, name):
-    flavors = get_flavors(nova, name)
-    if len(flavors) == 0:
+def delete_aggregate(module, nova, name):
+    aggregates = get_aggregates(nova, name)
+    if len(aggregates) == 0:
         return False
-    for flavor in flavors:
+    for aggregate in aggregates:
         try:
-            nova.flavors.delete(flavor.id);
+            nova.aggregates.delete(aggregate);
         except Exception as e:
-            module.fail_json(msg = "Could not delete flavor {0}: {1}".format(name, e.message))
+            module.fail_json(msg = "Could not delete aggregate {0}: {1}".format(name, e.message))
 
     return True
 
@@ -195,14 +166,10 @@ def main():
             auth_url = dict(default='http://127.0.0.1:35357/v2.0/'),
             region_name = dict(default=None),
             name = dict(required=True),
-            ram = dict(required=False),
-            vcpus = dict(required=False),
-            root = dict(required=False),
-            ephemeral = dict(required=False),
-            extra_specs = dict(required=False,default=None),
-            swap = dict(default=0),
             id = dict(default=None),
-            is_public = dict(default='true'),
+            availability_zone = dict(required=False),
+            hosts = dict(required=False),
+            metadata = dict(required=False, default=None),
             state = dict(default='present'),
         )
     )
@@ -212,24 +179,19 @@ def main():
     password = module.params['login_password']
     tenant_name = module.params['login_tenant_name']
     name = module.params['name']
-    ram = module.params['ram']
-    vcpus = module.params['vcpus']
-    root = module.params['root']
-    ephemeral = module.params['ephemeral']
-    extra_specs = module.params['extra_specs']
-    swap = module.params['swap']
+    availability_zone = module.params['availability_zone']
+    hosts = module.params['hosts']
+    metadata = module.params['metadata']
     id = module.params['id']
     state = module.params['state']
-    is_public = module.params['is_public']
 
     nova = authenticate(module, auth_url, username, password, tenant_name, region)
 
     if state == 'present':
-        changed, id = create_flavor(module, nova, name, ram, vcpus, root, ephemeral, swap, id,
-                                is_public, extra_specs)
+        changed, id = create_aggregate(module, nova, name, availability_zone, hosts, metadata, id)
         module.exit_json(changed=changed, name=name, id=id)
     elif state == 'absent':
-        changed = delete_flavor(module, nova, name)
+        changed = delete_aggregate(module, nova, name)
         module.exit_json(changed=changed, name=name)
     else:
         raise ValueError("Code should never reach here")
