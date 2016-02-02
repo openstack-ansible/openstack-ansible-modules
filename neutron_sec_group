@@ -55,8 +55,9 @@ options:
      default: None
    state:
      description:
-        - Indicate desired state of the security group
-     choices: ['present', 'absent']
+        - Indicate desired state of the security group. 'append' will
+	  add rules only, without deleting rules that are not listed.
+     choices: ['present', 'absent', 'append']
      default: present
    name:
      description:
@@ -140,7 +141,7 @@ def main():
             region_name=dict(default=None),
             rules=dict(default=None),
             tenant_name=dict(required=False),
-            state=dict(default='present', choices=['present', 'absent'])
+            state=dict(default='present', choices=['present', 'absent', 'append'])
         ),
         supports_check_mode=True
     )
@@ -180,7 +181,7 @@ def main():
             sec_group_exists = True
 
         # state=present -> create or update depending on whether sg exists.
-        if module.params['state'] == 'present':
+        if module.params['state'] == 'present' or module.params['state'] == 'append':
             # UPDATE
             if sec_group_exists:
                 changed, sg = _update_sg(module, network_client, sec_group, tenant_id)
@@ -328,13 +329,14 @@ def _update_sg_rules(module, network_client, sg, wanted_rules, tenant_id):
             sg = _create_sg_rules(network_client, sg, new_rules, tenant_id)
         changed = True
 
-    #then delete not ok
-    for rule in existing_rules:
-        if rule['id'] in ok_rules:
-            continue
-        if not module.check_mode:
-            sg = network_client.delete_security_group_rule(rule['id'])
-        changed = True
+    #then delete not ok if not append
+    if module.params['state'] != 'append':
+        for rule in existing_rules:
+            if rule['id'] in ok_rules:
+                continue
+            if not module.check_mode:
+                sg = network_client.delete_security_group_rule(rule['id'])
+	    changed = True
 
     return changed
 
