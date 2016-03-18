@@ -1,0 +1,199 @@
+#!/usr/bin/python
+#coding: utf-8 -*-
+
+# (c) 2014, Toni Ylenius <toni.ylenius@cybercom.com>
+#
+# This module is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this software. If not, see <http://www.gnu.org/licenses/>.
+
+try:
+    from novaclient import client
+    from keystoneclient.v2_0 import client as ksclient
+except ImportError:
+    print("failed=True msg='novaclient and keystone client are required'")
+
+DOCUMENTATION = '''
+---
+module: nova_quota
+short_description: Manage OpenStack Nova Quotas
+description:
+    - Sets tenant Quota in Nova
+requirements: [ python-keystoneclient, python-novaclient ]
+options:
+  login_username:
+    description:
+      - user name to authenticate against Identity service
+    required: True
+  login_password:
+    description:
+      - password to authenticate against Identity service
+    required: True
+  login_tenant_name:
+    description:
+      - tenant name of the login user
+    required: True
+  auth_url:
+    description:
+      - The keystone URL for authentication
+    required: false
+    default: 'http://127.0.0.1:35357/v2.0/'
+  region_name:
+    description:
+      - Name of the region
+    required: False
+    default: None
+  tenant_name:
+    description:
+      - tenant name
+    required: False
+    default: [login_tenant_name]
+  instances:
+    description:
+      - Number of Instances per tenant
+    required: False
+  cores:
+    description:
+      - Number of VCPUs per tenant
+    required: False
+  ram:
+    description:
+      - Memory in MB per tenant
+    required: False
+'''
+
+EXAMPLES = '''
+  - nova_quota:
+      login_username: admin
+      login_password: 1234
+      login_tenant_name: admin
+      tenant_name: tenant1
+      instances: 50
+      cores: 100
+      ram: 1024000
+'''
+
+def _get_keystone_client(module):
+    """
+    Return a Keystone client object.
+    :param module: module
+    :return: keystone client
+    """
+    try:
+        keystone = ksclient.Client(auth_url=module.params.get('auth_url'),
+                                   username=module.params['login_username'],
+                                   password=module.params['login_password'],
+                                   tenant_name=module.params['login_tenant_name'],
+                                   region=module.params.get('region'))
+    except Exception, e:
+        module.fail_json(
+            msg = "Could not authenticate with Keystone: %s" % e.message)
+
+    return keystone
+
+def _get_nova_client(module, keystone):
+    """
+    Return a Nova client object.
+    :param module: module
+    :return: nova client
+    """
+
+    try:
+        nova = client.Client('2', keystone.username,
+                                  keystone.password,
+                                  keystone.tenant_name,
+                                  keystone.auth_url)
+    except Exception, e:
+        module.fail_json(msg = "Could not get Nova client: %s" % e.message)
+
+    return nova
+
+def _get_tenant_id(module, keystone):
+    """
+    Returns the tenant_id
+    if tenant_name is not specified in the module params uses login_tenant_name
+    :param module: module
+    :param keystone: a keystone client used to get the tenant_id from its
+           name.
+    :return: tenant id
+    """
+    if not module.params['tenant_name']:
+        tenant_name = module.params['login_tenant_name']
+    else:
+        tenant_name = module.params['tenant_name']
+
+    tenants = keystone.tenants.list()
+    tenant = next((t for t in tenants if t.name == tenant_name), None)
+    if not tenant:
+        module.fail_json(msg ="Tenant with name '%s' not found." % tenant_name)
+
+    return tenant.id
+
+def _ensure_quota(module, nova, tenant_id):
+    """
+    Ensures quota. Returns quota and changed 
+    :param module: module
+    :param nova: a nova client
+    :return: changed (True/False), quota_set object
+    """
+    cur_quota = nova.quotas.get(tenant_id)
+    new_quota = {}
+    changed = False
+
+    for key in ('instances', 'cores', 'ram'):
+        if module.params[key]:
+            new_quota[key] = module.params[key]
+
+            if getattr(cur_quota, key) != new_quota[key]:
+                changed = True
+
+    if module.check_mode:
+        return changed, cur_quota.to_dict()
+
+    if changed:
+        try:
+            nova.quotas.update(tenant_id, **new_quota)
+            cur_quota = nova.quotas.get(tenant_id)
+        except Exception, e:
+            module.fail_json(msg = "Could not update quota: %s" % e.message)
+
+    return changed, cur_quota.to_dict()
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec = dict(
+            login_username = dict(default='admin'),
+            login_password = dict(required=True),
+            login_tenant_name = dict(required='True'),
+            auth_url = dict(default='http://127.0.0.1:35357/v2.0/'),
+            region_name = dict(default=None),
+            tenant_name = dict(required=False),
+            instances = dict(required=False),
+            cores = dict(required=False),
+            ram = dict(required=False),
+        ),
+        supports_check_mode = True
+    )
+
+    keystone = _get_keystone_client(module)
+    nova = _get_nova_client(module, keystone)
+
+    tenant_id = _get_tenant_id(module, keystone)
+    changed, quota = _ensure_quota(module, nova, tenant_id)
+
+    module.exit_json(changed=changed, tenant_id=tenant_id, quota=quota)
+
+# this is magic, see lib/ansible/module_common.py
+#<<INCLUDE_ANSIBLE_MODULE_COMMON>>
+if __name__ == '__main__':
+    main()
