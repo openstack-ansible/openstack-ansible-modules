@@ -1,0 +1,179 @@
+#!/bin/python
+
+from ansible.module_utils.basic import *
+try:
+    from cinderclient.v2 import client
+except ImportError:
+    print("failed=True msg='cinder client is required'")
+
+
+DOCUMENTATION = '''
+---
+module: cinder_configure
+short_description: Configure Openstack Block Storage (Cinder)
+description: Create Volume Types needed for deploying Cinder
+options:
+  action:
+    description:
+      - Currently only supported option is create
+    required: true
+    choices: [create]
+  username:
+    description:
+      - username used to authenticate with keystone.
+    required: true
+  password:
+    description:
+      - password used to authenticate with keystone.
+    required: true
+  url_auth:
+    description:
+      - keystone url for authentication.
+    required: true
+  tenant_name:
+    description:
+      - tenant name or project name of the login user
+    required: true
+  region_name:
+    description:
+      - region to connect to
+    required: true
+  name:
+    description:
+      - Name to be given to the volume type.
+    required: true
+  extra_specs:
+    description:
+      - A dictionary of extra specs to add to the volume type.
+    required: false
+requirements: [ cinder ]
+author: Rodrigo Soto
+'''
+
+EXAMPLES = '''
+cinder_volume_types:
+    action: create
+    username: admin
+    password: "{{keystone_admin_password}}"
+    tenant_name: admin
+    region_name: RegionOne
+    url_auth: "{{keystone_admin_url}}"
+    name: some-name
+    extra_specs: "volume_backend_name=some-name"
+'''
+
+
+def _get_cinderclient(module):
+    try:
+        cinder_client = client.Client(
+            module.params.get('username'),
+            module.params.get('password'),
+            module.params.get('tenant_name'),
+            module.params.get('url_auth'),
+            region_name=module.params.get('region_name')
+        )
+    except Exception as e:
+        module.fail_json(msg="Error authenticating to cinder: %s" % e.message)
+    return cinder_client
+
+
+def _get_volume_type(module, cinderclient):
+    name = module.params.get('name')
+    try:
+        volume_type = cinderclient.volume_types.find(name=name)
+        if volume_type is not None:
+            return volume_type
+    except Exception:
+        return None
+    return None
+
+
+def _create_volume_type(module, cinderclient):
+    name = module.params.get('name')
+    try:
+        volume_type_result = cinderclient.volume_types.create(name)
+    except Exception as e:
+        module.fail_json(msg="Error in creating volume type: %s" % e.message)
+    return volume_type_result
+
+
+def _delete_volume_type(module, cinderclient):
+    name = module.params.get('name')
+    try:
+        volume_type = cinderclient.volume_types.find(name=name)
+    except Exception as e:
+        module.fail_json(
+                msg="Error finding volume type to delete: %s" % e.message
+            )
+    try:
+        cinderclient.volume_types.delete(volume_type.id)
+    except Exception as e:
+        module.fail_json(
+                msg="Error in deleting the volume type: %s" % e.message
+            )
+    return True
+
+
+def _volume_type_set_keys(volume_type, extra_specs):
+    if extra_specs is not None:
+        extra_specs_dict = {}
+        extra_specs = extra_specs.split(',')
+        for extra_spec in extra_specs:
+            key, value = extra_spec.split('=')
+            extra_specs_dict[key] = value
+        try:
+            volume_type.set_keys(extra_specs_dict)
+        except Exception as e:
+            raise e
+
+
+def _get_volume_type_id(module, cinderclient):
+    name = module.params.get('name')
+    try:
+        volume_type = cinderclient.volume_types.find(name=name)
+    except Exception as e:
+        module.fail_json(
+                msg="Error finding volume type %s: %s" % (name, e.message)
+            )
+    return volume_type.id
+
+
+def main():
+    module = AnsibleModule(
+        argument_spec={
+            'action': {'default': 'create'},
+            'username': {'required': True},
+            'password': {'required': True},
+            'url_auth': {'required': True},
+            'tenant_name': {'required': True},
+            'region_name': {'required': True},
+            'name': {'required': True},
+            'extra_specs': {'required': False},
+        },
+    )
+
+    cinderclient = _get_cinderclient(module)
+
+    if module.params.get('action') == 'create':
+        volume_type = _get_volume_type(module, cinderclient)
+        if volume_type is None:
+            volume_type = _create_volume_type(module, cinderclient)
+            _volume_type_set_keys(
+                    volume_type, module.params.get('extra_specs')
+                )
+            module.exit_json(
+                    changed=True,
+                    result="Created",
+                    msg=volume_type.id
+                )
+        else:
+            _volume_type_set_keys(
+                    volume_type, module.params.get('extra_specs')
+                )
+            module.exit_json(
+                    changed=False,
+                    result="Success",
+                    msg=_get_volume_type_id(module, cinderclient)
+                )
+
+main()
