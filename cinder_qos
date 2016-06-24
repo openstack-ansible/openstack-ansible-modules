@@ -1,0 +1,250 @@
+#!/bin/python
+
+from ansible.module_utils.basic import *
+try:
+    from cinderclient.v2 import client
+except ImportError:
+    print("failed=True msg='cinder client is required'")
+
+DOCUMENTATION = '''
+---
+module: cinder_configure
+short_description: Configure Openstack Block Storage (Cinder)
+description: Create QoS needed for deploying Cinder
+options:
+  action:
+    description:
+      - The action corresponds to a Cinder qos command, such as cinder qos-create. 
+    required: true
+    choices: [create, associate, disassociate, key]
+  username:
+    description:
+      - username used to authenticate with keystone
+    required: true
+  password:
+    description:
+      - password used to authenticate with keystone
+    required: true
+  url_auth:
+    description:
+      - keystone url for authentication
+    required: true
+  tenant_name:
+    description:
+      - tenant name or project name of the login user
+    required: true
+  region_name:
+    description:
+      - region to connect to
+    required: true
+  name:
+    description:
+      - Name to be given to the QoS
+    required: true
+  extra_specs:
+    description:
+      - A dictionary of extra specs to add to the QoS
+    required: true
+  qos_volume_type:
+    description:
+      - The name of the volume-type to assign QoS to.
+    required: true
+requirements: [ cinder ]
+author: Rodrigo Soto
+'''
+
+EXAMPLES = '''
+cinder_qos:
+    action: create
+    username: admin
+    password: admin
+    url_auth: "http://keystone/v2"
+    tenant_name: admin
+    region_name: RegionOne
+    name: qos-test
+    extra_specs: "test=hello,test2=world"
+    qos_volume_type: some-type
+'''
+
+def _get_cinderclient(module):
+    try:
+        cinder_client = client.Client(
+            module.params.get('username'),
+            module.params.get('password'),
+            module.params.get('tenant_name'),
+            module.params.get('url_auth'),
+            region_name=module.params.get('region_name')
+        )
+    except Exception as e:
+        module.fail_json(msg="Error authenticating to cinder: %s" % e.message)
+    return cinder_client
+
+def _get_qos_id(module, cinderclient):
+    name = module.params.get('name')
+    try:
+        qos_list = cinderclient.qos_specs.list()
+        for qos in qos_list:
+            if qos.name == name:
+                return qos.id
+    except Exception:
+        return None
+
+
+def _create_qos(module, cinderclient):
+    name = module.params.get('name')
+    extra_specs = module.params.get('extra_specs').split(',')
+    extra_specs_dict = {}
+    for extra_spec in extra_specs:
+        key, value = extra_spec.split('=')
+        extra_specs_dict[key] = value
+ 
+    before = cinderclient.qos_specs.list()
+    try:
+        qos = cinderclient.qos_specs.create(name, extra_specs_dict)
+    except Exception as e:
+        module.fail_json(msg="Error creating qos: %s" % e.message)
+    
+    after = cinderclient.qos_specs.list()
+    changes = _qos_changes(before, after)
+    changed = True if changes else False
+    results = {'action': 'create'}
+    results.update(changes)
+    return (changed, results)
+
+def _get_volume_type_id(module, cinderclient):
+    name = module.params.get('qos_volume_type')
+    type_list = cinderclient.volume_types.list()
+
+    volume_type_id = ''
+    try:
+        for type in type_list:
+            if type.name == name:
+                volume_type_id = type.id
+    except Exception as e:
+        module.fail_json(msg="Error getting QoS Volume Type ID: %s" % e.message)
+
+    return volume_type_id
+
+def _associate_qos(module, cinderclient):
+    volume_type_id = _get_volume_type_id(module, cinderclient)
+    qos_id = _get_qos_id(module, cinderclient)
+    before = cinderclient.qos_specs.get_associations(qos_id)
+    try:
+        associate = cinderclient.qos_specs.associate(qos_id, volume_type_id)
+
+    except Exception as e:
+        module.fail_json(msg="Error associating qos: %s" % e.message)
+    after = cinderclient.qos_specs.get_associations(qos_id)
+    changes = _qos_changes(before, after)
+    changed = True if changes else False
+    results = {'action': 'associate'}
+    results.update(changes)
+    return (changed, results)
+        
+def _disassociate_qos(module, cinderclient):
+    volume_type_id = _get_volume_type_id(module, cinderclient)
+    qos_id = _get_qos_id(module, cinderclient)
+
+    before = cinderclient.qos_specs.get_associations(qos_id)
+
+    try:
+        cinderclient.qos_specs.disassociate(qos_id, volume_type_id)
+
+    except Exception as e:
+        module.fail_json(msg="Error disassociating qos: %s" % e.message)
+
+    after = cinderclient.qos_specs.get_associations(qos_id)
+    changes = _qos_changes(before, after)
+    changed = True if changes else False
+    results = {'action': 'disassociate'}
+    results.update(changes)
+    return (changed, results)
+
+
+def _set_qos_keys(module, cinderclient):
+    volume_type_id = _get_volume_type_id(module, cinderclient)
+    qos_id = _get_qos_id(module, cinderclient)
+    name = module.params.get('name')
+    extra_specs = module.params.get('extra_specs').split(',')
+    extra_specs_dict = {}
+
+    for extra_spec in extra_specs:
+        key, value = extra_spec.split('=')
+        extra_specs_dict[key] = value
+
+    before = cinderclient.qos_specs.get(qos_id)
+    try:
+       cinderclient.qos_specs.set_keys(qos_id, extra_specs_dict)
+
+    except Exception as e:
+        module.fail_json(msg="Error setting key(s) for qos: %s" % e.message)
+    
+    after = cinderclient.qos_specs.get(qos_id)
+    changes = _qos_changes(before, after)
+    changed = True if changes else False
+    results = {'action': 'set-key'}
+    results.update(changes)
+    return (changed, results)
+
+
+def _qos_changes(before, after):
+    
+    changes = {}    
+
+    if type(before) is list:
+      if before == after:
+          return changes
+      else:
+          changes['Changed']='True' 
+          return changes
+
+    before_dict = {}
+    for attr,value in before.__dict__.iteritems():
+        before_dict[attr] = value
+
+    after_dict = {}
+    for attr,value in after.__dict__.iteritems():
+        after_dict[attr] = value
+
+    for key in before_dict:
+        if before_dict[key] != after_dict[key]:
+            changes[key] = after_dict[key]
+
+    return changes
+
+def main():
+    module = AnsibleModule(
+        argument_spec={
+            'action': {'required': True,  'default': None}, 
+            'username': {'required': True},
+            'password': {'required': True},
+            'url_auth': {'required': True},
+            'tenant_name': {'required': True},
+            'region_name': {'required': True},
+            'name': {'required': True},
+            'extra_specs': {'required': True},
+            'qos_volume_type': {'required': True}
+        },
+    )
+    cinderclient = _get_cinderclient(module)
+    if module.params.get('action') == 'create':
+        qos_id = _get_qos_id(module, cinderclient)
+        if qos_id is None:
+            changed, results = _create_qos(module, cinderclient)
+        else:
+            module.exit_json(changed=False, result="Success", msg=qos_id)
+
+    elif module.params.get('action') == 'associate':
+        qos_id = _get_qos_id(module, cinderclient)
+        changed, results = _associate_qos(module, cinderclient) 
+
+    elif module.params.get('action') == 'key':
+        qos_id = _get_qos_id(module, cinderclient)
+        changed, results = _set_qos_keys(module, cinderclient)
+
+    elif module.params.get('action') == 'disassociate':
+        qos_id = _get_qos_id(module, cinderclient)
+        changed, results = _disassociate_qos(module, cinderclient)
+
+    module.exit_json(changed=changed, item=results)
+main()
