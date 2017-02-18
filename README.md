@@ -39,7 +39,7 @@ Create and apply a role:
 
 Manage services and endpoints
 
-    keystone_service: token=$admin_token name=keystone type=identity desecription="Identity Service" public_url="http://192.168.206.130:5000/v2.0" internal_url="http://192.168.206.130:5000/v2.0" admin_url="http://192.168.206.130:35357/v2.0"
+    keystone_service: token=$admin_token name=keystone type=identity description="Identity Service" public_url="http://192.168.206.130:5000/v2.0" internal_url="http://192.168.206.130:5000/v2.0" admin_url="http://192.168.206.130:35357/v2.0"
 
 You can use `url` as an alias for `public_url`. If you don't specify internal and admin urls, they will default to the same value of public url. For example:
 
