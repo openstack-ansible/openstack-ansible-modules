@@ -31,7 +31,7 @@ try:
     # https://bugs.launchpad.net/glance/+bug/885529
     from keystone.openstack.common import gettextutils
     gettextutils.install('keystone')
-except AttributeError:
+except ImportError:
     # this is not havana
     pass
 
